@@ -23,7 +23,9 @@ from app.core.config import settings
 GROUP_NAME = "chat-to-postgres"
 FLUSH_SIZE = 200
 FLUSH_INTERVAL = 10.0
-POLL_INTERVAL = 0.5  # flush 되는 조건이 충족되지 않았을 때 xreadgroup의 대기시간(초)
+POLL_INTERVAL = 1.0  # flush 되는 조건이 충족되지 않았을 때 xreadgroup의 대기시간(초)
+RECLAIM_INTERVAL = 10.0  # 초
+RECLAIM_IDLE_MS = 10_000  # 10초 이상 방치된 pending만 회수
 
 
 async def ensure_group(r: Redis) -> None:
@@ -39,12 +41,11 @@ async def ensure_group(r: Redis) -> None:
         print(f"{GROUP_NAME}이 이미 존재합니다.")
 
 
-def parse_resp(resp: Any) -> tuple[list[tuple[Any, Any, Any]], list[Any]]:
+def parse_entries(entries: Any) -> tuple[list[tuple[Any, Any, Any]], list[Any]]:
     """
     redis stream에 저장할 때는 bid, parts, received_at만 넣었지만
     xreadgroup 응답은 [(stream_key, [(entry_id, fields), ...])]라서 파싱하는 작업.
     """
-    _, entries = resp[0]
     rows = []
     ids = []
     for entry_id, fields in entries:
@@ -52,6 +53,7 @@ def parse_resp(resp: Any) -> tuple[list[tuple[Any, Any, Any]], list[Any]]:
         ids.append(entry_id)
 
     return rows, ids
+
 
 
 def make_sql(rows: list[tuple[Any, Any, Any]]) -> str:
@@ -95,7 +97,27 @@ async def read_group_and_save(
     buffer_ids = []
     # monotonic: 가장 최근 컴퓨터 부팅 시점을 기준으로 단조 증가하는 시간을 돌려주는 함수.
     last_flush = monotonic()
+    last_reclaim = monotonic()
+
     while True:
+        # RECLAIM_INTERVAL(초)마다 xautoclaim 호출(pending 확인)
+        if monotonic() - last_reclaim >= RECLAIM_INTERVAL:
+            _, claimed, _ = await r.xautoclaim(
+                settings.redis_stream_key,
+                GROUP_NAME,
+                worker,
+                min_idle_time=RECLAIM_IDLE_MS,
+                count=FLUSH_SIZE,
+            )
+
+            if claimed:
+                rows, ids = parse_entries(claimed)
+                buffer_rows.extend(rows)
+                buffer_ids.extend(ids)
+
+            last_reclaim = monotonic()
+
+
         resp = await r.xreadgroup(
             GROUP_NAME,
             consumername=worker,
@@ -104,7 +126,8 @@ async def read_group_and_save(
             block=1000,
         )
         if resp:
-            rows, ids = parse_resp(resp)
+            _, entries = resp[0]
+            rows, ids = parse_entries(entries)
             buffer_rows.extend(rows)
             buffer_ids.extend(ids)
 

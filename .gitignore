@@ -31,3 +31,4 @@ nickname.txt
 /benchmarks/chat/discard/
 /benchmarks/scripts/
 /sqls/a.sql
+*.zip
