@@ -1,0 +1,33 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+.env
+
+# development tool
+.mypy_cache/
+.ruff_cache/
+.pytest_cache
+.coverage
+
+# macOS
+.DS_Store
+
+#
+temp/
+
+# 
+memo/
+nickname.txt
+/results/
+/md/
+/tests/
+/benchmarks/chat/discard/
+/benchmarks/scripts/
+/sqls/a.sql

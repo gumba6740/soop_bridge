@@ -1,0 +1,74 @@
+[project]
+name = "soop-chat"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi[standard]==0.139.0",
+    "httpx>=0.28.1",
+    "numpy>=2.5.1",
+    "psycopg-pool>=3.3.1",
+    "psycopg[binary]>=3.3.4",
+    "redis>=8.0.1",
+    "requests>=2.34.2",
+    "sqlalchemy>=2.0.51",
+    "uvicorn>=0.50.0",
+    "websockets>=16.0",
+]
+
+[dependency-groups]
+dev = [
+    "locust>=2.46.2",
+    "mypy>=2.1.0",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "pytest-cov>=7.1.0",
+    "pytest-sugar>=1.1.1",
+    "ruff>=0.15.20",
+]
+
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle 에러
+    "F",    # pyflakes (안 쓰는 import, 미정의 변수 등)
+    "I",    # isort (import 정렬)
+    "UP",   # 낡은 문법을 최신 문법으로
+    "B",    # flake8-bugbear (흔한 버그 패턴)
+    "SIM",  # 코드 단순화 제안
+]
+
+[tool.ruff.lint.pycodestyle]
+max-line-length = 100
+
+[tool.mypy]
+plugins = ["pydantic.mypy"]
+python_version = "3.13"
+strict = true
+warn_unused_ignores = true
+warn_return_any = true
+
+[[tool.mypy.overrides]]
+module = ["tests", "tests.*"]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_calls = false
+disallow_untyped_decorators = false
+
+
+[tool.uv]
+package = true
+
+[tool.setuptools]
+packages = ["app"]
+
+
+[tool.pytest.ini_options]
+addopts = "--tb=short"
+pythonpath = ["."]
+asyncio_mode = "strict"
