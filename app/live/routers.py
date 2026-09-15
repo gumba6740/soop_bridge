@@ -3,13 +3,13 @@ from typing import Annotated
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 from psycopg.rows import DictRow
 
-from app.chat.schemas import (
+from app.live.schemas import (
     GetChatsResponse,
     GetStatsResponse,
     MinutelyChat,
     UserChatRanking,
 )
-from app.chat.services import get_chats, stat_ingredient, stat_key
+from app.live.services import get_chats, stat_ingredient, stat_key
 from app.core.deps import DBDep, RDep, RgDep
 
 router = APIRouter()

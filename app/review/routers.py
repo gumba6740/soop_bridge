@@ -3,10 +3,10 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 import xml.etree.ElementTree as ET
 
-from app.vod.soop_api import get_vod_chat
+from app.review.soop_api import get_vod_chat
 
 
-from app.vod.schemas import (
+from app.review.schemas import (
     ChatMessage,
     QualityOption,
     VodChatResponse,
@@ -15,7 +15,7 @@ from app.vod.schemas import (
     VodItem,
     VodListResponse,
 )
-from app.vod.soop_api import get_vod_detail, get_vod_list
+from app.review.soop_api import get_vod_detail, get_vod_list
 
 router = APIRouter(prefix="/vod", tags=["vod"])
 

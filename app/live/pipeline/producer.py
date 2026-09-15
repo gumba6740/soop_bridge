@@ -16,7 +16,7 @@ from datetime import UTC, datetime
 import redis.asyncio as redis
 from redis.typing import EncodableT, FieldT
 
-from app.chat.pipeline.get_soop_chats import stream_soop_chats
+from app.live.pipeline.get_soop_chats import stream_soop_chats
 from app.core.config import settings
 
 stream_key = settings.redis_stream_key

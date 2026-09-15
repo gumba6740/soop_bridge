@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS vods (
     inserted_at    timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_vods_bid_broad_start ON vods (bid, broad_start);
+CREATE INDEX IF NOT EXISTS idx_vods_bid_broad_start 
+ON vods (bid, broad_start);
 
 -------------------------------------------------------
 -- vod_files: VOD 파트별 정보
