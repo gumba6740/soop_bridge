@@ -1,7 +1,7 @@
 services:
   db:
     image: postgres:18.1
-    container_name: soop_chat_db
+    container_name: soop_bridge_db
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -19,7 +19,7 @@ services:
   
   redis:
     image: redis:8.2-alpine
-    container_name: soop_chat_redis
+    container_name: soop_bridge_redis
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     ports:
