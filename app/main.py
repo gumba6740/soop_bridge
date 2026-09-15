@@ -2,13 +2,15 @@ from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse
 
-from app.chat.routers import router
+from app.chat.routers import router as chat_router
+from app.vod.routers import router as vod_router
 from app.core.exc import BaseAppException, exception_handler
 from app.core.lifespan import lifespan
 
 app = FastAPI(lifespan=lifespan)
 
-app.include_router(router)
+app.include_router(chat_router)
+app.include_router(vod_router)
 
 
 # Exception Handler
