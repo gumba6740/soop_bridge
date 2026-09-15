@@ -1,9 +1,15 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Query
+import xml.etree.ElementTree as ET
+
+from app.vod.soop_api import get_vod_chat
+
 
 from app.vod.schemas import (
+    ChatMessage,
     QualityOption,
+    VodChatResponse,
     VodDetailResponse,
     VodFile,
     VodItem,
@@ -83,4 +89,43 @@ async def vod_detail(vod_id: int) -> VodDetailResponse:
         broad_start=inner.get("broad_start"),
         thumbnail=inner.get("thumb"),
         files=files,
+    )
+
+@router.get("/vods/{vod_id}/chat", response_model=VodChatResponse)
+async def vod_chat(
+    vod_id: int,
+    start_time: Annotated[int, Query(ge=0)] = 0,
+) -> VodChatResponse:
+    """VOD 채팅 데이터 (300초 단위)."""
+    # 1. VOD 상세에서 chat_url 가져오기
+    detail = await get_vod_detail(vod_id)
+    inner = detail.get("data", {})
+    files = inner.get("files", [])
+    if not files:
+        return VodChatResponse(vod_id=vod_id, start_time=start_time, messages=[])
+
+    chat_url = files[0].get("chat", "")
+    if not chat_url:
+        return VodChatResponse(vod_id=vod_id, start_time=start_time, messages=[])
+
+    # 2. 채팅 XML 가져오기
+    xml_text = await get_vod_chat(chat_url, start_time)
+
+    # 3. XML 파싱
+    root = ET.fromstring(xml_text)
+    messages = []
+    for chat in root.findall("chat"):
+        messages.append(
+            ChatMessage(
+                message=chat.findtext("m", ""),
+                user_id=chat.findtext("u", ""),
+                nickname=chat.findtext("n", ""),
+                time=float(chat.findtext("t", "0")),
+            )
+        )
+
+    return VodChatResponse(
+        vod_id=vod_id,
+        start_time=start_time,
+        messages=messages,
     )

@@ -12,6 +12,11 @@ import httpx
 VOD_LIST_URL = "https://chapi.sooplive.com/api/{bid}/vods/review"
 VOD_DETAIL_URL = "https://api.m.sooplive.com/station/video/a/view"
 
+CHAT_HEADERS = {
+    "Origin": "https://vod.sooplive.com",
+    "Referer": "https://vod.sooplive.com/",
+}
+
 
 async def get_vod_list(
     bid: str, page: int = 1, per_page: int = 20
@@ -63,3 +68,23 @@ async def get_vod_detail(vod_id: int) -> dict[str, Any]:
     resp.raise_for_status()
     data: dict[str, Any] = resp.json()
     return data
+
+
+async def get_vod_chat(
+    chat_url: str, start_time: int = 0
+) -> str:
+    """VOD 채팅 데이터를 가져온다 (300초 단위).
+
+    Args:
+        chat_url: VOD 상세 응답의 chat_url
+        start_time: 시작 시간 (초)
+
+    Returns:
+        XML 문자열
+    """
+    async with httpx.AsyncClient(headers=CHAT_HEADERS) as client:
+        resp = await client.get(
+            f"{chat_url}&startTime={start_time}",
+        )
+    resp.raise_for_status()
+    return resp.text

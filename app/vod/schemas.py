@@ -52,3 +52,17 @@ class VodDetailResponse(p.BaseModel):
     broad_start: str | None = None
     thumbnail: str | None = None
     files: list[VodFile]
+
+
+class ChatMessage(p.BaseModel):
+    """채팅 메시지 하나."""
+    message: str
+    user_id: str
+    nickname: str
+    time: float  # VOD 시작 기준 초
+
+class VodChatResponse(p.BaseModel):
+    """VOD 채팅 응답."""
+    vod_id: int
+    start_time: int
+    messages: list[ChatMessage]
