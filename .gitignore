@@ -32,4 +32,5 @@ nickname.txt
 /benchmarks/scripts/
 /sqls/a.sql
 *.zip
-/app/review/result.md
+/app/review/result/
+bid.py

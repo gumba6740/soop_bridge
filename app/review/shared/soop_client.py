@@ -149,7 +149,7 @@ async def get_vod_chat(chat_url: str, start_time: int = 0) -> str:
     # f-string으로 "&startTime=" 을 붙이면 chat_url에 '?'가 없을 때 깨진다.
     # params로 넘기면 httpx가 기존 쿼리스트링에 안전하게 병합한다.
     resp = await get_client().get(
-        chat_url,
+        chat_url,  # soop의 vod 상세 정보 응답 혹은 db에서 가져와서 넣어준다.
         params={"startTime": start_time},
         headers=CHAT_HEADERS,
     )
