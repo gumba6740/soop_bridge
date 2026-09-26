@@ -34,3 +34,4 @@ nickname.txt
 *.zip
 /app/review/result/
 bid.py
+streamers.py
