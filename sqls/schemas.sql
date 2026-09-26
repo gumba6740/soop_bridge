@@ -35,6 +35,7 @@ CREATE TABLE vods (
     media_code       integer,
     auth_no          smallint,
     broad_idx        bigint,
+    hashtags         text[]      NOT NULL DEFAULT '{}',
 
     view_cnt         integer,
     live_total_view  integer,

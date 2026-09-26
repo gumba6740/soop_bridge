@@ -45,14 +45,14 @@ VOD_SQL = """
     INSERT INTO vods (
         vod_id, bid, title, total_duration, broad_start, broad_end,
         grade, auth_no, permanence, auto_delete_date, chat_duration,
-        media_code, broad_idx, view_cnt, live_total_view
+        media_code, broad_idx, hashtags, view_cnt, live_total_view
     )
     VALUES (
         %(vod_id)s, %(bid)s, %(title)s, %(total_duration)s,
         %(broad_start)s, %(broad_end)s,
         %(grade)s, %(auth_no)s, %(permanence)s, %(auto_delete_date)s,
         %(chat_duration)s, %(media_code)s, %(broad_idx)s,
-        %(view_cnt)s, %(live_total_view)s
+        %(hashtags)s, %(view_cnt)s, %(live_total_view)s
     )
     ON CONFLICT (vod_id) DO NOTHING
 """

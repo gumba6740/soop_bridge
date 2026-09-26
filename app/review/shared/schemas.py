@@ -58,6 +58,7 @@ class VodRow(_SoopModel):
     chat_duration: int = 300                    # 초. 채팅 조회 단위
     media_code: int | None = None               # media_exception.code
     broad_idx: int | None = None                # 방송 세션 번호
+    hashtags: list[str] = Field(default_factory=list)  # "a,b,c" -> ["a", "b", "c"]
 
     view_cnt: int | None = None
     live_total_view: int | None = None
@@ -93,6 +94,15 @@ class VodRow(_SoopModel):
     @classmethod
     def _ensure_tzinfo(cls, v: datetime | None) -> datetime | None:
         return _to_kst(v)
+
+    @field_validator("hashtags", mode="before")
+    @classmethod
+    def _split_hashtags(cls, v: Any) -> Any:
+        if v is None:
+            return []
+        if isinstance(v, str):
+            return [t.strip() for t in v.split(",") if t.strip()]
+        return v
 
 
 class VodFileRow(_SoopModel):
