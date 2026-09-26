@@ -6,14 +6,14 @@
 SOOP VOD 목록은 최신순으로 오고, title_no(=vod_id)는 단조 증가함을 이용함.
 
 수집: bid -> vod_id 리스트 -> vod_id 상세정보
-    -> 성공 시 vods, vod_files에 저장. 실패 시 vod_fetch_failures에 기록.
+    -> 성공시 vods, vod_files에 저장, 실패 시 vod_fetch_failures에 기록
 수집 재시도: retry -> db에 기록한 수집 실패 vod_id 목록 -> vod_id 상세정보 -> 저장
+누락 수집(sweep): 목록 전체 vod_id와 DB의 vod_id를 대조 -> 빠진 것만 상세정보 -> 저장
 
 메타데이터의 해당 스트리머의 총 영상 개수(meta.total)와 DB 건수를 비교해 누락을 감지한다.
-어긋나면 --sweep 으로 워터마크를 무시하고 전체를 훑는다.
+어긋나면 sweep으로 누락분을 채운다.
 """
 
-import argparse
 import asyncio
 import logging
 from typing import Any
@@ -22,18 +22,15 @@ import httpx
 from psycopg import AsyncConnection
 from pydantic import ValidationError
 
-from app.core.config import settings
-from app.core.streamers import BID
 from app.review.shared.schemas import VodFileRow, VodRow
-from app.review.shared.soop_client import aclose, get_vod_detail, get_vod_list
+from app.review.shared.soop_client import get_vod_detail, get_vod_list
 
 logger = logging.getLogger(__name__)
 
 REQUEST_DELAY = 2.0      # 초. 모든 외부 요청 직전에 무조건 적용.
 PER_PAGE = 60            # 서버가 20 ~ 60까지 받는 것을 확인함.
 MAX_RETRY_ATTEMPTS = 5   # 이 횟수를 넘으면 permanent로 승격.
-LOCK_KEY = 0x50D_A001    # pg advisory lock 키.
-FILES_COVERAGE_WARN = 0.95  # 파트별 영상길이 합계가 total_duration(영상 총 길이)의 
+FILES_COVERAGE_WARN = 0.95  # 파트별 영상길이 합계가 total_duration(영상 총 길이)의
                             # 비율이 이것 미만이면 누락으로 판단.
 
 
@@ -88,6 +85,14 @@ ACCOUNTED_SQL = """
             WHERE bid = %(bid)s)
 """
 
+# sweep 대조용. 실패 테이블도 포함해야 영구 실패분을 매번 다시 요청하지 않는다.
+# 일시 실패분은 retry가 담당한다.
+KNOWN_IDS_SQL = """
+    SELECT vod_id FROM vods WHERE bid = %(bid)s
+    UNION
+    SELECT vod_id FROM vod_fetch_failures WHERE bid = %(bid)s
+"""
+
 RETRYABLE_SQL = """
     SELECT vod_id, bid
     FROM vod_fetch_failures
@@ -107,10 +112,12 @@ async def _scalar(conn: AsyncConnection, sql: str, params: Any) -> int:
 async def fetch_new_vod_ids(bid: str, watermark: int) -> tuple[list[int], int]:
     """워터마크보다 큰 vod_id를 오름차순으로 반환한다. DB를 건드리지 않는다.
 
+    watermark=0이면 경계에 도달하지 않으므로 전체 목록을 가져온다 (sweep).
+
     메타 데이터 파싱:
-        last_page를 가져와서 루프의 끝을 정함. 
+        last_page를 가져와서 루프의 끝을 정함.
         total로 해당 스트리머의 총 영상 갯수를 가져옴.
-    
+
     데이터 파싱:
         가져온 vod_id들(page_ids) 중 새로운 것(new_ids)만 걸러낸다.
         워터마크 경계에 도달하면 루프를 중단한다.
@@ -168,7 +175,7 @@ async def fetch_new_vod_ids(bid: str, watermark: int) -> tuple[list[int], int]:
             logger.info("[%s] 경계 도달 (페이지 %d에서 중단)", bid, page)
             break
 
-    # 오래된 순으로 정렬. 
+    # 오래된 순으로 정렬.
     return sorted(set(vod_ids)), total
 
 
@@ -236,9 +243,9 @@ async def record_failure(
 def _log_coverage(bid: str, vod: VodRow, files: list[VodFileRow]) -> None:
     """각 영상 파트 duration 합계와 total_duration을 비교해 누락을 알린다.
 
-    19금(grade=19) 파트의 경우 응답에서 누락될 수 있는데, 
+    19금(grade=19) 파트의 경우 응답에서 누락될 수 있는데,
     file_order만으로는 누락 여부 확인이 불명확해서 duration으로 확인함.
-    
+
     디비에는 저장하지 않고 로그 출력용.
     """
     if not files:
@@ -302,15 +309,10 @@ async def process_vod(conn: AsyncConnection, vod_id: int, bid: str) -> bool:
     return is_inserted
 
 
-async def collect_new_vods(conn: AsyncConnection, bid: str, *, sweep: bool = False) -> int:
-    """한 스트리머의 새 VOD를 수집 → 저장한다. 신규 저장 건수를 반환.
-
-    sweep=True면 워터마크를 0으로 두고 전체 페이지를 훑는다.
-    """
-    watermark = 0 if sweep else await _scalar(conn, WATERMARK_SQL, (bid,))
-    logger.info(
-        "[%s] 워터마크 vod_id=%d%s", bid, watermark, " (sweep)" if sweep else ""
-    )
+async def collect_new_vods(conn: AsyncConnection, bid: str) -> int:
+    """한 스트리머의 새 VOD를 워터마크 기준으로 수집 → 저장한다. 신규 저장 건수를 반환."""
+    watermark = await _scalar(conn, WATERMARK_SQL, (bid,))
+    logger.info("[%s] 워터마크 vod_id=%d", bid, watermark)
 
     vod_ids, total = await fetch_new_vod_ids(bid, watermark)
 
@@ -337,6 +339,30 @@ async def collect_new_vods(conn: AsyncConnection, bid: str, *, sweep: bool = Fal
     return saved
 
 
+async def sweep_missing_vods(conn: AsyncConnection, bid: str) -> int:
+    """목록 전체와 DB를 대조해 빠진 VOD만 수집한다. 신규 저장 건수를 반환.
+
+    워터마크 방식은 워터마크보다 작은 id의 누락을 복구하지 못하므로,
+    목록 전체 id에서 DB에 있는 id(저장 + 실패 기록)를 뺀 것만 상세 요청한다.
+    """
+    list_ids, _ = await fetch_new_vod_ids(bid, watermark=0)
+
+    cur = await conn.execute(KNOWN_IDS_SQL, {"bid": bid})
+    known = {row[0] for row in await cur.fetchall()}
+
+    missing = sorted(set(list_ids) - known)
+    logger.info(
+        "[%s] sweep: 목록 %d / DB %d / 누락 %d",
+        bid, len(list_ids), len(known), len(missing),
+    )
+
+    saved = 0
+    for vod_id in missing:
+        if await process_vod(conn, vod_id, bid):
+            saved += 1
+    return saved
+
+
 # ---------------------------------------------------------------- 재시도
 
 async def retry_failures(conn: AsyncConnection) -> int:
@@ -353,59 +379,3 @@ async def retry_failures(conn: AsyncConnection) -> int:
         if await process_vod(conn, vod_id, bid):
             saved += 1
     return saved
-
-
-# TODO: 실행부는 chats.py 완성 이후 __main__.py로 옮김.
-async def main(*, retry: bool = False, sweep: bool = False) -> None:
-    # autocommit=True: 페이지 순회 중 트랜잭션이 열린 채 sleep하는
-    # idle-in-transaction 상태를 원천 차단한다. 쓰기만 명시적으로 묶는다.
-    async with await AsyncConnection.connect(
-        settings.postgres_url, autocommit=True
-    ) as conn:
-        # 크론 중복 실행 방지. 이전 실행이 안 끝났으면 그냥 빠진다.
-        # 세션 레벨 락이라 프로세스가 강제 종료돼도 커넥션이 끊기면 자동 해제된다.
-        if not await _scalar(
-            conn, "SELECT pg_try_advisory_lock(%s)::int", (LOCK_KEY,)
-        ):
-            logger.warning("이전 실행이 아직 진행 중 — 이번 실행 건너뜀")
-            return
-
-        try:
-            if retry:
-                n = await retry_failures(conn)
-                logger.info("=== 재시도 완료: %d건 저장 ===", n)
-                return
-
-            for nick, bid in BID.items():
-                logger.info("=== %s (%s) 시작 ===", nick, bid)
-                try:
-                    saved = await collect_new_vods(conn, bid, sweep=sweep)
-                except Exception:
-                    # 한 스트리머 실패가 나머지 전부를 죽이지 않게 격리
-                    logger.exception("[%s] 동기화 실패 — 다음으로", nick)
-                    await conn.rollback()
-                    continue
-                logger.info("=== %s 완료: %d건 저장 ===", nick, saved)
-        finally:
-            await conn.execute("SELECT pg_advisory_unlock(%s)", (LOCK_KEY,))
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="SOOP VOD 메타 수집")
-    parser.add_argument(
-        "--retry", action="store_true", help="신규 수집 대신 실패분만 재시도"
-    )
-    parser.add_argument(
-        "--sweep", action="store_true", help="워터마크 무시하고 전체 페이지 훑기"
-    )
-    args = parser.parse_args()
-
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(message)s",
-    )
-
-    try:
-        asyncio.run(main(retry=args.retry, sweep=args.sweep))
-    finally:
-        asyncio.run(aclose())
