@@ -12,7 +12,6 @@
 5. 구간 하나가 끝날 때마다 진행 상태를 커밋한다. 중단 지점이 곧 재개 지점.
 """
 
-import argparse
 import asyncio
 from datetime import datetime
 import logging
@@ -20,16 +19,14 @@ import logging
 import httpx
 from psycopg import AsyncConnection
 
-from app.core.config import settings
 from app.review.shared.chat_parser import parse_chat_xml
 from app.review.shared.schemas import KST
-from app.review.shared.soop_client import aclose, get_vod_chat
+from app.review.shared.soop_client import get_vod_chat
 
 logger = logging.getLogger(__name__)
 
 REQUEST_DELAY = 2.0     # 초. 채팅 요청 사이 텀
 CHAT_COLLECT_SINCE = datetime(2026, 9, 1, tzinfo=KST)  # 크론 자동 수집 기준일.
-LOCK_KEY = 0x50D_B001   # 크론 B 전용 전역 락 (크론 A는 0x50DA001)
 
 # ---------------------------------------------------------------- SQL
 # CHAT_PARTS_SQL은 이 쿼리보다 조건이 좁으면 안 된다.
@@ -241,40 +238,3 @@ async def collect_vod_chats(conn: AsyncConnection, vod_id: int | None = None) ->
         )
 
     return total
-
-
-# ---------------------------------------------------------------- 엔트리
-
-# async def main() -> None:
-#     async with await AsyncConnection.connect(
-#         settings.postgres_url, autocommit=True
-#     ) as conn:
-#         cur = await conn.execute("SELECT pg_try_advisory_lock(%s)", (LOCK_KEY,))
-#         row = await cur.fetchone()
-#         if not (row and row[0]):
-#             logger.warning("이전 실행이 아직 진행 중 — 이번 실행 건너뜀")
-#             return
-
-#         try:
-#             for _ in range(MAX_VODS_PER_RUN):
-#                 n = await collect_vod_chats(conn)
-#                 if n == 0:
-#                     break
-#                 logger.info("=== VOD 1건 완료: 채팅 %d건 ===", n)
-#         finally:
-#             await conn.execute("SELECT pg_advisory_unlock(%s)", (LOCK_KEY,))
-
-
-# if __name__ == "__main__":
-#     parser = argparse.ArgumentParser(description="SOOP VOD 채팅 수집")
-#     args = parser.parse_args()
-
-#     logging.basicConfig(
-#         level=logging.INFO,
-#         format="%(asctime)s %(levelname)s %(message)s",
-#     )
-
-#     try:
-#         asyncio.run(main())
-#     finally:
-#         asyncio.run(aclose())
