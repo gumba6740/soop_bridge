@@ -3,7 +3,7 @@
 동작
 ----
 1. CHAT_COLLECT_SINCE 이후 VOD 중 채팅 수집이 안 끝난 것을
-    오래된 순으로 하나 고르고, 그 VOD의 미완료 파트를 순서대로 처리한다.
+    오래된 순으로 고르고(크론은 --count개까지), 각 VOD의 미완료 파트를 순서대로 처리한다.
 2. 파트 단위 advisory lock을 걸어 동시성 제어.
 3. last_start_time부터 chat_duration(기본 300초) 단위로 
     영상 파트가 끝나는 시점까지 채팅을 긁는다.
@@ -32,10 +32,10 @@ CHAT_COLLECT_SINCE = datetime(2026, 9, 1, tzinfo=KST)  # 크론 자동 수집 �
 # CHAT_PARTS_SQL은 이 쿼리보다 조건이 좁으면 안 된다.
 # (VOD를 골랐는데 파트가 0개면 크론이 같은 VOD에서 멈춘다.)
 # 쿨다운(updated_at) 조건은 크론에만 적용하려고 여기에만 둔다.
-NEXT_CHAT_TARGET_SQL = """
-    SELECT f.vod_id
-    FROM vod_files f
-    JOIN vods v ON v.vod_id = f.vod_id
+NEXT_CHAT_TARGETS_SQL = """
+    SELECT v.vod_id
+    FROM vods v
+    JOIN vod_files f ON f.vod_id = v.vod_id
     LEFT JOIN chat_progress p
         ON p.vod_id = f.vod_id AND p.file_order = f.file_order
     WHERE f.chat_url IS NOT NULL
@@ -44,8 +44,9 @@ NEXT_CHAT_TARGET_SQL = """
     AND (p.done IS NULL OR NOT p.done)
     AND v.broad_start >= %s
     AND (p.updated_at IS NULL OR p.updated_at < now() - interval '1 hour')
+    GROUP BY v.vod_id
     ORDER BY v.broad_start ASC
-    LIMIT 1
+    LIMIT %s
 """
 
 CHAT_PARTS_SQL = """
@@ -196,21 +197,20 @@ async def collect_part(
         )
 
 
-async def next_chat_target(conn: AsyncConnection) -> int | None:
-    """CHAT_COLLECT_SINCE 이후 VOD 중 미완료인 것을 오래된 순으로 하나 고른다(크론).
+async def next_chat_targets(conn: AsyncConnection, limit: int) -> list[int]:
+    """CHAT_COLLECT_SINCE 이후 VOD 중 미완료인 것을 오래된 순으로 최대 limit개 고른다(크론).
 
     Return:
-        vod_id. 수집할 VOD가 없으면 None.
+        vod_id 리스트. 수집할 VOD가 없으면 빈 리스트.
     """
-    cur = await conn.execute(NEXT_CHAT_TARGET_SQL, (CHAT_COLLECT_SINCE,))
-    row = await cur.fetchone()
-    return row[0] if row else None
+    cur = await conn.execute(NEXT_CHAT_TARGETS_SQL, (CHAT_COLLECT_SINCE, limit))
+    return [row[0] for row in await cur.fetchall()]
 
 
 async def collect_vod_chats(conn: AsyncConnection, vod_id: int) -> int:
     """VOD 하나의 미완료 파트를 전부 수집한다. 저장한 채팅 수를 반환.
 
-    크론은 next_chat_target()으로 고른 vod_id를,
+    크론은 next_chat_targets()로 고른 vod_id를,
     수동은 지정한 vod_id를 넘긴다.
     """
     cur = await conn.execute(CHAT_PARTS_SQL, (vod_id,))
