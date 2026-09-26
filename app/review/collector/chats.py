@@ -196,21 +196,23 @@ async def collect_part(
         )
 
 
-async def collect_vod_chats(conn: AsyncConnection, vod_id: int | None = None) -> int:
+async def next_chat_target(conn: AsyncConnection) -> int | None:
+    """CHAT_COLLECT_SINCE 이후 VOD 중 미완료인 것을 오래된 순으로 하나 고른다(크론).
+
+    Return:
+        vod_id. 수집할 VOD가 없으면 None.
+    """
+    cur = await conn.execute(NEXT_CHAT_TARGET_SQL, (CHAT_COLLECT_SINCE,))
+    row = await cur.fetchone()
+    return row[0] if row else None
+
+
+async def collect_vod_chats(conn: AsyncConnection, vod_id: int) -> int:
     """VOD 하나의 미완료 파트를 전부 수집한다. 저장한 채팅 수를 반환.
 
-    vod_id를 주면 그 VOD를 수집한다(수동).
-    없으면 CHAT_COLLECT_SINCE 이후 VOD 중 미완료인 것을
-    오래된 순으로 하나 고른다(크론).
+    크론은 next_chat_target()으로 고른 vod_id를,
+    수동은 지정한 vod_id를 넘긴다.
     """
-    if vod_id is None:
-        cur = await conn.execute(NEXT_CHAT_TARGET_SQL, (CHAT_COLLECT_SINCE,))
-        row = await cur.fetchone()
-        if row is None:
-            logger.info("수집할 VOD 없음")
-            return 0
-        vod_id = row[0]
-
     cur = await conn.execute(CHAT_PARTS_SQL, (vod_id,))
 
     parts = await cur.fetchall()
