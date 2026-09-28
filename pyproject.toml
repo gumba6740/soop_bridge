@@ -10,6 +10,8 @@ dependencies = [
     "numpy>=2.5.1",
     "psycopg-pool>=3.3.1",
     "psycopg[binary]>=3.3.4",
+    "pydantic>=2.13.4",
+    "pydantic-settings>=2.14.2",
     "redis>=8.0.1",
     "requests>=2.34.2",
     "sqlalchemy>=2.0.51",
@@ -26,6 +28,13 @@ dev = [
     "pytest-cov>=7.1.0",
     "pytest-sugar>=1.1.1",
     "ruff>=0.15.20",
+]
+
+collector = [
+    "httpx>=0.28.1",
+    "psycopg[binary]>=3.3.4",
+    "pydantic>=2.13.4",
+    "pydantic-settings>=2.14.2",
 ]
 
 

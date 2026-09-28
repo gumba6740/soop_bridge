@@ -1,3 +1,10 @@
+# 모든 서비스 공통 로그 설정. 기본 json-file은 용량 제한이 없어서 디스크를 계속 차지한다.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   db:
     image: postgres:18.1
@@ -16,7 +23,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-  
+    logging: *default-logging
+
   redis:
     image: redis:8.2-alpine
     container_name: soop_bridge_redis
@@ -31,6 +39,26 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    logging: *default-logging
+
+  # VOD/채팅 수집 크론. supercronic이 PID 1로 돌면서 docker/collector.cron 일정대로 실행한다.
+  # 로그 확인: docker compose logs -f collector
+  # 수동 실행: docker compose exec collector scripts/collect.sh vods --bid <bid>
+  collector:
+    build:
+      context: .
+      dockerfile: docker/collector.Dockerfile
+    container_name: soop_bridge_collector
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      TZ: Asia/Seoul
+    depends_on:
+      db:
+        condition: service_healthy
+    logging: *default-logging
 
 volumes:
   postgres_data:

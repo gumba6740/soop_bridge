@@ -1666,6 +1666,8 @@ dependencies = [
     { name = "numpy" },
     { name = "psycopg", extra = ["binary"] },
     { name = "psycopg-pool" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
     { name = "redis" },
     { name = "requests" },
     { name = "sqlalchemy" },
@@ -1674,6 +1676,12 @@ dependencies = [
 ]
 
 [package.dev-dependencies]
+collector = [
+    { name = "httpx" },
+    { name = "psycopg", extra = ["binary"] },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+]
 dev = [
     { name = "locust" },
     { name = "mypy" },
@@ -1691,6 +1699,8 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.5.1" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3.4" },
     { name = "psycopg-pool", specifier = ">=3.3.1" },
+    { name = "pydantic", specifier = ">=2.13.4" },
+    { name = "pydantic-settings", specifier = ">=2.14.2" },
     { name = "redis", specifier = ">=8.0.1" },
     { name = "requests", specifier = ">=2.34.2" },
     { name = "sqlalchemy", specifier = ">=2.0.51" },
@@ -1699,6 +1709,12 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
+collector = [
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "psycopg", extras = ["binary"], specifier = ">=3.3.4" },
+    { name = "pydantic", specifier = ">=2.13.4" },
+    { name = "pydantic-settings", specifier = ">=2.14.2" },
+]
 dev = [
     { name = "locust", specifier = ">=2.46.2" },
     { name = "mypy", specifier = ">=2.1.0" },
