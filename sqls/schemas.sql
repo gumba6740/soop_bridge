@@ -78,7 +78,8 @@ CREATE TABLE vod_fetch_failures (
     permanent     boolean     NOT NULL DEFAULT false,
     attempts      integer     NOT NULL DEFAULT 1,
     first_seen_at timestamptz NOT NULL DEFAULT now(),
-    last_tried_at timestamptz NOT NULL DEFAULT now()
+    last_tried_at timestamptz NOT NULL DEFAULT now(),
+    resolved_at   timestamptz
 );
 
 -------------------------------------------------------

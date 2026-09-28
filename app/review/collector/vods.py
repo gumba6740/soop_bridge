@@ -63,6 +63,7 @@ VOD_FILE_SQL = """
             hls_url  = EXCLUDED.hls_url
 """
 
+# vod 상세정보 수집이 실패했을 때 호출됨.
 FAILURE_SQL = """
     INSERT INTO vod_fetch_failures (vod_id, bid, reason, permanent)
     VALUES (%(vod_id)s, %(bid)s, %(reason)s, %(permanent)s)
@@ -74,7 +75,13 @@ FAILURE_SQL = """
             last_tried_at = now()
 """
 
-CLEAR_FAILURE_SQL = "DELETE FROM vod_fetch_failures WHERE vod_id = %s"
+# 실패 기록된 vod 상세정보를 재시도해서 성공했을 때 호출
+RESOLVE_FAILURE_SQL = """
+    UPDATE vod_fetch_failures
+    SET resolved_at = now()
+    WHERE vod_id = %s
+    AND resolved_at IS NULL
+"""
 
 WATERMARK_SQL = "SELECT COALESCE(MAX(vod_id), 0) FROM vods WHERE bid = %s"
 
@@ -82,7 +89,7 @@ WATERMARK_SQL = "SELECT COALESCE(MAX(vod_id), 0) FROM vods WHERE bid = %s"
 ACCOUNTED_SQL = """
     SELECT (SELECT count(*) FROM vods WHERE bid = %(bid)s)
         + (SELECT count(*) FROM vod_fetch_failures
-            WHERE bid = %(bid)s)
+            WHERE bid = %(bid)s AND resolved_at IS NULL)
 """
 
 # sweep 대조용. 실패 테이블도 포함해야 영구 실패분을 매번 다시 요청하지 않는다.
@@ -93,10 +100,12 @@ KNOWN_IDS_SQL = """
     SELECT vod_id FROM vod_fetch_failures WHERE bid = %(bid)s
 """
 
+# 재시도 대상을 고를 때 호출
 RETRYABLE_SQL = """
     SELECT vod_id, bid
     FROM vod_fetch_failures
     WHERE NOT permanent
+    AND resolved_at IS NULL
     ORDER BY last_tried_at
 """
 
@@ -220,7 +229,7 @@ async def save_vod(
         if files:
             await conn.executemany(VOD_FILE_SQL, [f.model_dump() for f in files])
 
-        await conn.execute(CLEAR_FAILURE_SQL, (vod.vod_id,))
+        await conn.execute(RESOLVE_FAILURE_SQL, (vod.vod_id,))
 
     return inserted
 
