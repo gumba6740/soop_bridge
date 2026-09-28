@@ -1,0 +1,17 @@
+# Virtual environments
+.env
+.env.*
+.venv
+venv
+
+# git, 캐시, 편집기 파일
+.git
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+.vscode
+.idea
+**/.DS_Store
+**/*.log
