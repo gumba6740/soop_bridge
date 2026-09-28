@@ -21,11 +21,11 @@ from psycopg import AsyncConnection
 
 from app.review.shared.chat_parser import parse_chat_xml
 from app.review.shared.schemas import KST
-from app.review.shared.soop_client import get_vod_chat
+from app.review.shared.soop_client import get_vod_chat, polite_sleep
 
 logger = logging.getLogger(__name__)
 
-REQUEST_DELAY = 2.0     # 초. 채팅 요청 사이 텀
+REQUEST_DELAY = 1.0     # 초. 채팅 요청 사이 텀
 CHAT_COLLECT_SINCE = datetime(2026, 9, 1, tzinfo=KST)  # 크론 자동 수집 기준일.
 
 # ---------------------------------------------------------------- SQL
@@ -135,7 +135,7 @@ async def collect_part(
 
     try:
         while start < part_seconds:
-            await asyncio.sleep(REQUEST_DELAY)
+            await polite_sleep(REQUEST_DELAY)
 
             try:
                 xml = await get_vod_chat(chat_url, start_time=start)

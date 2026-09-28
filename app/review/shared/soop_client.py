@@ -9,7 +9,9 @@
 재시도 큐가 무한히 쌓이는 걸 막을 수 있다.
 """
 
+import asyncio
 import logging
+import random
 from typing import Any
 
 import httpx
@@ -155,3 +157,7 @@ async def get_vod_chat(chat_url: str, start_time: int = 0) -> str:
     )
     resp.raise_for_status()
     return resp.text
+
+
+async def polite_sleep(base: float, jitter: float = 1.5) -> None:
+    await asyncio.sleep(base + random.uniform(0, jitter))

@@ -23,11 +23,11 @@ from psycopg import AsyncConnection
 from pydantic import ValidationError
 
 from app.review.shared.schemas import VodFileRow, VodRow
-from app.review.shared.soop_client import get_vod_detail, get_vod_list
+from app.review.shared.soop_client import get_vod_detail, get_vod_list, polite_sleep
 
 logger = logging.getLogger(__name__)
 
-REQUEST_DELAY = 2.0      # 초. 모든 외부 요청 직전에 무조건 적용.
+REQUEST_DELAY = 1.0      # 초. 모든 외부 요청 직전에 무조건 적용.
 PER_PAGE = 60            # 서버가 20 ~ 60까지 받는 것을 확인함.
 MAX_RETRY_ATTEMPTS = 5   # 이 횟수를 넘으면 permanent로 승격.
 FILES_COVERAGE_WARN = 0.95  # 파트별 영상길이 합계가 total_duration(영상 총 길이)의
@@ -160,7 +160,7 @@ async def fetch_new_vod_ids(bid: str, watermark: int) -> tuple[list[int], int]:
         if page == 1:
             data = first
         else:
-            await asyncio.sleep(REQUEST_DELAY)
+            await polite_sleep(REQUEST_DELAY)
             data = await get_vod_list(bid, page=page, per_page=PER_PAGE)
 
         # 데이터 파싱.
@@ -287,7 +287,7 @@ async def process_vod(conn: AsyncConnection, vod_id: int, bid: str) -> bool:
 
     실패는 여기서 삼키고 vod_fetch_failures에 기록한다.
     """
-    await asyncio.sleep(REQUEST_DELAY)  # 성공/실패 무관하게 요청 직전에
+    await polite_sleep(REQUEST_DELAY)  # 성공/실패 무관하게 요청 직전에
 
     try:
         data = await get_vod_detail(vod_id)
