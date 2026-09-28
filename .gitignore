@@ -32,6 +32,6 @@ nickname.txt
 /benchmarks/scripts/
 /sqls/a.sql
 *.zip
-/app/review/result/
+/app/review/zzresult/
 bid.py
 streamers.py
