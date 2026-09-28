@@ -1,5 +1,5 @@
 [project]
-name = "soop-chat"
+name = "soop-bridge"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
