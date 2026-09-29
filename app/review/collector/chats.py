@@ -12,7 +12,6 @@
 5. 구간 하나가 끝날 때마다 진행 상태를 커밋한다. 중단 지점이 곧 재개 지점.
 """
 
-import asyncio
 from datetime import datetime
 import logging
 
@@ -170,9 +169,10 @@ async def collect_part(
                     {"vod_id": vod_id, "file_order": file_order, "lo": lo, "hi": hi},
                 )
                 if rows:
-                    await conn.executemany(
-                        INSERT_CHAT_SQL, [r.model_dump() for r in rows]
-                    )
+                    async with conn.cursor() as cur:
+                        await cur.executemany(
+                            INSERT_CHAT_SQL, [r.model_dump() for r in rows]
+                        )
 
                 start += chat_duration
                 await conn.execute(
@@ -217,7 +217,7 @@ async def collect_vod_chats(conn: AsyncConnection, vod_id: int) -> int:
 
     parts = await cur.fetchall()
     if not parts:
-        logger.info("수집할 파트 없음")
+        logger.info("vod_id=%d 수집할 파트 없음 (vods 미수집이거나 이미 완료)", vod_id)
         return 0
 
     total = 0

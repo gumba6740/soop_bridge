@@ -2,8 +2,13 @@
 # collector 수동 실행 스크립트.
 
 # 사용 예:
+#   docker compose exec collector scripts/collect.sh vods
 #   docker compose exec collector scripts/collect.sh vods --bid <bid>
-#   docker compose exec collector scripts/collect.sh chats --vod-id 12345
+#   docker compose exec collector scripts/collect.sh vods --retry
+#   docker compose exec collector scripts/collect.sh vods --sweep --bid <bid>
+# 
+#   docker compose exec collector scripts/collect.sh chats --count <int>
+#   docker compose exec collector scripts/collect.sh chats --vod-id <vod_id>
 
 set -o pipefail   # 파이프 구간 중 하나라도 실패하면 스크립트도 실패로 끝낸다.
 

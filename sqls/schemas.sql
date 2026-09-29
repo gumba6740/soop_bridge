@@ -1,7 +1,7 @@
 -- docker compose exec -T db psql -U soop -d soop_bridge -v ON_ERROR_STOP=1 -1 < sqls/schemas.sql
 
 -- DROP TABLE IF EXISTS chats;
--- DROP TABLE IF EXISTS vod_chat_progress;
+-- DROP TABLE IF EXISTS chat_progress;
 -- DROP TABLE IF EXISTS vod_files;
 -- DROP TABLE IF EXISTS vod_fetch_failures;
 -- DROP TABLE IF EXISTS vods;
@@ -17,6 +17,7 @@
 --   media_code       : media_exception.code. 1 = 정상, -6303 = 구독+ 잠김
 --   broad_idx        : 방송 세션 번호. 한 방송이 여러 VOD로 쪼개진 경우 묶는 키
 --   broad_end        : write_tm("시작 ~ 종료")의 뒷부분
+--   hashtags         : 쉼표 구분 문자열("a,b,c" 등)을 배열로 분리해서 저장
 --   view_cnt/live_total_view: 차이가 다시보기 조회수.
 --                      최초 수집 시점 스냅샷이며 이후 갱신되지 않는다
 -------------------------------------------------------
@@ -70,6 +71,7 @@ CREATE TABLE vod_files (
 -- permanent = false : 429/5xx/파싱 실패 등. 백오프 후 재시도.
 -- first_seen_at     : 처음 수집 시도 날짜
 -- last_tried_at     : 마지막 수집 시도 날짜
+-- resolved_at       : 재시도 등으로 성공한 시각. NULL이면 미해결
 -------------------------------------------------------
 CREATE TABLE vod_fetch_failures (
     vod_id        bigint      PRIMARY KEY,

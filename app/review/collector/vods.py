@@ -14,7 +14,6 @@ SOOP VOD 목록은 최신순으로 오고, title_no(=vod_id)는 단조 증가함
 어긋나면 sweep으로 누락분을 채운다.
 """
 
-import asyncio
 import logging
 from typing import Any
 
@@ -135,6 +134,7 @@ async def fetch_new_vod_ids(bid: str, watermark: int) -> tuple[list[int], int]:
         (신규 vod_id 리스트, meta.total). total을 모르면 0.
     """
     # 1페이지는 last_page, total을 얻기 위해 먼저 받고, 루프에서 재사용한다.
+    await polite_sleep(REQUEST_DELAY)
     first = await get_vod_list(bid, page=1, per_page=PER_PAGE)
 
     # 메타 데이터 파싱.
@@ -227,7 +227,10 @@ async def save_vod(
         inserted = cur.rowcount > 0
 
         if files:
-            await conn.executemany(VOD_FILE_SQL, [f.model_dump() for f in files])
+            async with conn.cursor() as cur:
+                await cur.executemany(
+                    VOD_FILE_SQL, [f.model_dump() for f in files]
+                )
 
         await conn.execute(RESOLVE_FAILURE_SQL, (vod.vod_id,))
 
@@ -291,7 +294,7 @@ async def process_vod(conn: AsyncConnection, vod_id: int, bid: str) -> bool:
 
     try:
         data = await get_vod_detail(vod_id)
-    except (httpx.HTTPStatusError, httpx.TransportError) as e:
+    except httpx.HTTPError as e:
         logger.warning("[RETRY] vod_id=%d 상세 조회 실패: %s", vod_id, e)
         await record_failure(conn, vod_id, bid, f"http: {e}", permanent=False)
         return False

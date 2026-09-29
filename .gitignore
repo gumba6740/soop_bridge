@@ -33,4 +33,6 @@ __a/md/
 /sqls/a.sql
 *.zip
 /app/review/zzresult/
-streamers.py
+
+# dockerignore에서 주의
+app/core/streamers.py
