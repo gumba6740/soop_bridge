@@ -14,7 +14,7 @@ XML 구조
 - 루트의 직계 자식 하나가 채팅 1건이고, 태그명이 chats 테이블의 type 컬럼이다.
 - 자식 요소의 텍스트를 문서 순서대로 parts: list[]에 담는다.
     t 태그는 time_offset 컬럼으로 분리하고, 나머지를 parts 필드에 넣음.
-    type별로 구조가 다름. 인덱스 매핑은 schemas.sql 주석 참고.
+    type별로 구조가 다름. 인덱스 매핑은 docs/chat_types.md 참고.
 """
 
 import logging
@@ -27,8 +27,12 @@ logger = logging.getLogger(__name__)
 # 시간 필드로 쓰는 태그 이름
 TIME_TAG = "t"
 
+# TODO: challenge_mission은 세부 타입에 따라 구조가 바뀌므로 데이터 확인
 # 알고 있는 타입. 여기 없는 태그가 나오면 경고만 남기고 그대로 저장한다.
-KNOWN_TYPES = frozenset({"chat", "ogq", "balloon", "challenge_mission"})
+KNOWN_TYPES = frozenset({
+    "chat", "ogq", "balloon", "challenge_mission",
+    "adballoon", "vballoon", "follow", "fanclub", "ice",
+})
 # 스킵할 태그 목록
 # version: 위치는 <root>의 내부. 영상 시작 시 딱 한번 등장.
 SKIP_TAGS = frozenset({"version"})
