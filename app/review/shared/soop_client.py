@@ -149,10 +149,11 @@ async def get_vod_chat(chat_url: str, start_time: int = 0) -> str:
         XML 문자열
     """
     # f-string으로 "&startTime=" 을 붙이면 chat_url에 '?'가 없을 때 깨진다.
-    # params로 넘기면 httpx가 기존 쿼리스트링에 안전하게 병합한다.
+    # 그렇다고 params=로 넘기면 httpx(0.28 기준)가 기존 쿼리스트링을 통째로 교체해서
+    # rowKey가 사라진다. copy_merge_params로 기존 쿼리스트링에 병합한다.
+    url = httpx.URL(chat_url).copy_merge_params({"startTime": start_time})
     resp = await get_client().get(
-        chat_url,  # soop의 vod 상세 정보 응답 혹은 db에서 가져와서 넣어준다.
-        params={"startTime": start_time},
+        url,  # soop의 vod 상세 정보 응답 혹은 db에서 가져와서 넣어준다.
         headers=CHAT_HEADERS,
     )
     resp.raise_for_status()
