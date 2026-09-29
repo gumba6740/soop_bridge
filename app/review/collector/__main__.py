@@ -95,9 +95,9 @@ async def run_vods(
                     saved = await collect_new_vods(conn, b)
             except Exception:
                 # 한 스트리머 실패가 나머지를 죽이지 않게 격리
-                logger.exception("[%s] 수집 실패. 다음으로", nick)
+                logger.exception("=== %s (%s) 실패. 다음으로 ===", nick, b)
                 continue
-            logger.info("=== %s 완료: %d건 저장 ===", nick, saved)
+            logger.info("=== %s (%s) 완료: %d건 저장 ===", nick, b, saved)
 
 
 # ---------------------------------------------------------------- chats
@@ -107,8 +107,7 @@ async def run_chats(
 ) -> None:
     # 수동: 지정한 VOD. 기준일/쿨다운 무시, 전역 락 없음.
     if vod_id is not None:
-        n = await collect_vod_chats(conn, vod_id)
-        logger.info("=== vod_id=%d 채팅 %d건 저장 ===", vod_id, n)
+        await collect_vod_chats(conn, vod_id)
         return
 
     assert count is not None  # argparse가 --count/--vod-id 중 하나를 강제한다
@@ -125,10 +124,9 @@ async def run_chats(
             return
 
         for i, target in enumerate(targets, 1):
-            n = await collect_vod_chats(conn, target)
-            logger.info(
-                "=== [%d/%d] vod_id=%d 채팅 %d건 저장 ===", i, len(targets), target, n
-            )
+            logger.info("chats 진행 [%d/%d]", i, len(targets))
+            await collect_vod_chats(conn, target)
+
 
 
 # ---------------------------------------------------------------- 엔트리

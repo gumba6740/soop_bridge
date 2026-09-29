@@ -92,6 +92,9 @@ PROGRESS_SQL = """
         updated_at      = now()
 """
 
+# 시작/끝 로그에 bid를 찍고, vods 미수집 여부를 구분하는 데 쓴다.
+VOD_BID_SQL = "SELECT bid FROM vods WHERE vod_id = %s"
+
 
 # ---------------------------------------------------------------- 수집
 
@@ -213,12 +216,20 @@ async def collect_vod_chats(conn: AsyncConnection, vod_id: int) -> int:
     크론은 next_chat_targets()로 고른 vod_id를,
     수동은 지정한 vod_id를 넘긴다.
     """
+    cur = await conn.execute(VOD_BID_SQL, (vod_id,))
+    row = await cur.fetchone()
+    if row is None:
+        logger.info("vod_id=%d vods에 없음. vods 수집부터 필요", vod_id)
+        return 0
+    bid = row[0]
+
+    logger.info("=== chats %s vod_id=%d 시작 ===", bid, vod_id)
+
     cur = await conn.execute(CHAT_PARTS_SQL, (vod_id,))
 
     parts = await cur.fetchall()
     if not parts:
-        logger.info("vod_id=%d 수집할 파트 없음 (vods 미수집이거나 이미 완료)", vod_id)
-        return 0
+        logger.info("vod_id=%d 수집할 파트 없음 (이미 완료했거나 파트가 없는 VOD)", vod_id)
 
     total = 0
     for (vod_id, file_order, chat_url, duration, file_start,
@@ -239,4 +250,5 @@ async def collect_vod_chats(conn: AsyncConnection, vod_id: int) -> int:
             last_start_time=last_start_time,
         )
 
+    logger.info("=== chats %s vod_id=%d 완료: %d건 저장 ===", bid, vod_id, total)
     return total
