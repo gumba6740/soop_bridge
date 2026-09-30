@@ -10,8 +10,11 @@ from fastapi import FastAPI
 from psycopg_pool import AsyncConnectionPool
 
 from app.core.config import settings
-from app.core.log import logger
+from app.core.soop_clients.review_client import aclose
+import logging
 
+
+logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
@@ -22,7 +25,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     채팅 reader도 여기서 관리한다(api 호출 횟수와 무관하게 딱 한번 호출하려는 목적).
     """
     async with (
-        AsyncConnectionPool(settings.postgres_url, min_size=10) as pool,
+        AsyncConnectionPool(
+            settings.postgres_url,
+            min_size=10,
+            kwargs={"autocommit": True},
+        ) as pool,
         redis.from_url(settings.redis_url, decode_responses=True) as r,
     ):
         app.state.pool = pool
@@ -34,6 +41,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             yield
         finally:
             task.cancel()
+            await aclose()
 
 
 streamkey = settings.redis_stream_key

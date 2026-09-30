@@ -37,4 +37,4 @@ __a/md/
 *.log
 
 # dockerignore에서 주의
-app/core/streamers.py
+app/core/soop_clients/streamers.py

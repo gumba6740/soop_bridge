@@ -22,7 +22,7 @@ from psycopg import AsyncConnection
 from pydantic import ValidationError
 
 from app.review.shared.schemas import VodFileRow, VodRow
-from app.review.shared.soop_client import get_vod_detail, get_vod_list, polite_sleep
+from app.core.soop_clients.review_client import get_vod_detail, get_vod_list, polite_sleep
 
 logger = logging.getLogger(__name__)
 

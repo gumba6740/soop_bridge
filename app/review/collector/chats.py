@@ -20,7 +20,7 @@ from psycopg import AsyncConnection
 
 from app.review.shared.chat_parser import parse_chat_xml
 from app.review.shared.schemas import KST
-from app.review.shared.soop_client import get_vod_chat, polite_sleep
+from app.core.soop_clients.review_client import get_vod_chat, polite_sleep
 
 logger = logging.getLogger(__name__)
 

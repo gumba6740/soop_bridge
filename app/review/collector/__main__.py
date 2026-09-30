@@ -27,14 +27,14 @@ from psycopg import AsyncConnection
 
 from app.core.config import settings
 from app.core.log import setup_logging
-from app.core.streamers import BID
+from app.core.soop_clients.streamers import BID
 from app.review.collector.chats import collect_vod_chats, next_chat_targets
 from app.review.collector.vods import (
     collect_new_vods,
     retry_failures,
     sweep_missing_vods,
 )
-from app.review.shared.soop_client import aclose
+from app.core.soop_clients.review_client import aclose
 
 logger = logging.getLogger(__name__)
 
