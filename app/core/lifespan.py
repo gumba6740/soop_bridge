@@ -5,12 +5,12 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import cast
 
-import redis.asyncio as redis
 from fastapi import FastAPI
-from psycopg_pool import AsyncConnectionPool
 
 from app.core.config import settings
 from app.core.soop_clients.review_client import aclose
+from app.core.db import engine
+from app.core.r import redis_client as r
 import logging
 
 
@@ -18,30 +18,18 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
-    """fastapi 앱과 생명주기를 같이 하는 함수.
+    """fastapi 앱과 생명주기를 같이 하는 함수."""
 
-    앱이 켜지면 워커(uvicorn 등) 당 딱 한 번씩 호출되고, 앱이 종료되면 같이 종료됨.
-    db 풀, redis 클라이언트, live api를 통해 등록된 웹소켓을 관리하며,
-    채팅 reader도 여기서 관리한다(api 호출 횟수와 무관하게 딱 한번 호출하려는 목적).
-    """
-    async with (
-        AsyncConnectionPool(
-            settings.postgres_url,
-            min_size=10,
-            kwargs={"autocommit": True},
-        ) as pool,
-        redis.from_url(settings.redis_url, decode_responses=True) as r,
-    ):
-        app.state.pool = pool
-        app.state.redis = r
-        app.state.registry = {}
-        task = asyncio.create_task(reader(app))
+    app.state.registry = {}
+    task = asyncio.create_task(reader(app))
 
-        try:
-            yield
-        finally:
-            task.cancel()
-            await aclose()
+    try:
+        yield
+    finally:
+        task.cancel()
+        await aclose()
+        await r.aclose()
+        await engine.dispose()
 
 
 streamkey = settings.redis_stream_key
@@ -54,7 +42,6 @@ StreamResp = list[tuple[str, list[StreamEntry]]]
 
 
 async def reader(app: FastAPI) -> None:
-    r: redis.Redis = app.state.redis
     rg = app.state.registry
     last_id = "$"
 
