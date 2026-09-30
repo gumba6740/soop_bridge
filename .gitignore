@@ -27,10 +27,11 @@ __a/memo/
 __a/nickname.txt
 __a/results/
 __a/md/
-/tests/
 /benchmarks/chat/discard/
 /benchmarks/scripts/
 /sqls/a.sql
+/sqls/chats_bench.sql
+/sqls/d_schemas.sql
 *.zip
 /app/review/zzresult/
 .local
@@ -38,3 +39,6 @@ __a/md/
 
 # dockerignore에서 주의
 app/core/soop_clients/streamers.py
+
+#
+/tests/
