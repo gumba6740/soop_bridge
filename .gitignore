@@ -21,27 +21,27 @@ wheels/
 
 #
 temp/
-
-# 
-/__a/memo/
-/__a/nickname.txt
-/__a/results/
-/__a/md/
-/benchmarks/chat/discard/
-/benchmarks/scripts/
-/sqls/a.sql
-/sqls/chats_bench.sql
-/sqls/d_schemas.sql
-/scripts/pack.py
-
-
 *.zip
-/app/review/zzresult/
 .local
 *.log
 
+# 
+
+/__a/*
+!/__a/study/
+
+/benchmarks/chat/discard/
+/benchmarks/scripts/
+/sqls/*
+!/sqls/schemas.sql
+
+/scripts/pack.py
+
+/app/review/zzresult/
+
+
 # dockerignore에서 주의
-app/core/soop_clients/streamers.py
+/app/core/soop_clients/streamers.py
 
 #
 /tests/
