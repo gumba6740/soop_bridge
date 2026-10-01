@@ -1,3 +1,5 @@
+-- 보존용. 이 파일은 더이상 업데이트되지 않음.
+
 -- docker compose exec -T db psql -U soop -d soop_bridge -v ON_ERROR_STOP=1 -1 < sqls/schemas.sql
 
 -- DROP TABLE IF EXISTS chats;

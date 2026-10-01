@@ -159,3 +159,19 @@ class Chat(Base):
     type: Mapped[str] = mapped_column(Text)
     time_offset: Mapped[float] = mapped_column(Double)  # float8
     parts: Mapped[list[str]] = mapped_column(ARRAY(Text))
+
+
+# ---------------------------------------------------------------- vod_views
+
+class VodView(Base):
+    """우리 서비스에서 집계하는 조회수. SOOP 데이터와 주인이 달라서 분리."""
+
+    __tablename__ = "vod_views"
+
+    vod_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("vods.vod_id", ondelete="CASCADE"),
+        primary_key=True,
+        autoincrement=False,
+    )
+    cnt: Mapped[int] = mapped_column(BigInteger, server_default=text("0"))
