@@ -38,6 +38,7 @@ temp/
 /scripts/pack.py
 
 /app/review/zzresult/
+/app/review/discard/
 
 
 # dockerignore에서 주의

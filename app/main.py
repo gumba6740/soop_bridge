@@ -3,7 +3,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse
 
 from app.live.routers import router as chat_router
-from app.review.routers import router as vod_router
+from app.review.api.routers import router as vod_router
 from app.core.exc import BaseAppException, exception_handler
 from app.core.lifespan import lifespan
 from app.core.log import setup_logging
