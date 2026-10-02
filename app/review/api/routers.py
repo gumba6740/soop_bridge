@@ -9,6 +9,7 @@ from app.review.api import services
 from app.review.api.schemas.vod_schemas import (
     StreamerOut, VodDetailOut, VodListOut
 )
+from app.review.api.schemas.chat_schemas import ChatWindowOut
 
 router = APIRouter(tags=["review"])
 
@@ -36,3 +37,12 @@ async def list_vods(
 @router.get("/vods/{vod_id}")
 async def get_vod(db: DBDep, vod_id: int) -> VodDetailOut:
     return await services.get_vod(db, vod_id)
+
+
+@router.get("/vods/{vod_id}/chats")
+async def get_chats(
+    db: DBDep,
+    vod_id: int,
+    start: Annotated[float, Query(ge=0, description="초, 포함")],
+) -> ChatWindowOut:
+    return await services.get_chats(db, vod_id, start=start)
