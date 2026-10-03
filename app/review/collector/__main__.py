@@ -8,6 +8,8 @@
     python -m app.review.collector chats --count 3         # 크론: 미완료 VOD 최대 3건
     python -m app.review.collector chats --vod-id 12345    # 수동: 지정 VOD
 
+    python -m app.review.collector worker                  # 온디맨드 채팅 수집 워커(상시 실행)
+
 chats는 --count와 --vod-id 중 하나를 반드시 붙여야 한다.
 
 전역 락
@@ -34,6 +36,7 @@ from app.review.collector.vods import (
     retry_failures,
     sweep_missing_vods,
 )
+from app.review.collector.worker import run_worker
 from app.core.soop_clients.review_client import aclose
 
 logger = logging.getLogger(__name__)
@@ -151,6 +154,8 @@ def _build_parser() -> argparse.ArgumentParser:
     target.add_argument("--count", type=int, help="미완료 VOD를 최대 이만큼 수집 (크론)")
     target.add_argument("--vod-id", type=int, help="이 VOD만 수집 (기준일/쿨다운 무시)")
 
+    sub.add_parser("worker", help="온디맨드 채팅 수집 워커 (redis 큐 대기)")
+
     return parser
 
 
@@ -168,6 +173,10 @@ async def main() -> None:
         parser.error("--count는 1 이상이어야 한다")
 
     try:
+        if args.command == "worker":
+            await run_worker()
+            return
+
         # autocommit=True: 요청 사이 sleep 동안 트랜잭션이 열려 있지 않게 한다.
         # 묶어야 하는 쓰기는 각 함수에서 conn.transaction()으로 명시한다.
         async with await AsyncConnection.connect(

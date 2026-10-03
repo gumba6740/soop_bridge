@@ -60,6 +60,35 @@ services:
         condition: service_healthy
     logging: *default-logging
 
+  # 온디맨드 채팅 수집 워커. collector와 같은 이미지에 실행 명령만 다르다.
+  # API가 redis 큐에 넣은 vod_id를 꺼내 채팅을 수집한다.
+  collector-worker:
+    build:
+      context: .
+      dockerfile: docker/collector.Dockerfile
+    container_name: soop_bridge_collector_worker
+    restart: unless-stopped
+    command: ["python", "-m", "app.review.collector", "worker"]
+    # 컨테이너 stop 시 python을 안전하게 종료하기 위해 init과 SIGINT를 사용
+    init: true
+    stop_signal: SIGINT
+    # 컨테이너 stop 시 기다리는 시간.
+    stop_grace_period: 30s
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      TZ: Asia/Seoul
+      RUN_SOURCE: worker   # 로그에 [worker] 표시
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    logging: *default-logging
+
 volumes:
   postgres_data:
   redis_data:

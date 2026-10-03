@@ -1,6 +1,7 @@
 import json
 from datetime import UTC, datetime, timedelta
 from typing import cast
+import logging
 
 from fastapi import WebSocket, WebSocketDisconnect
 from psycopg.rows import DictRow, dict_row
@@ -8,7 +9,9 @@ from redis.asyncio import Redis
 
 from app.core.config import settings
 from app.core.deps import DBDep
-from app.core.log import logger
+
+logger = logging.getLogger(__name__)
+
 
 SQL = """SELECT bid, user_id, user_nickname, message
     FROM chats_view

@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env")
 
-    # Database settings
+    # ---------------------------------------------------- Database
     postgres_user: str
     postgres_password: str
     postgres_db: str
@@ -24,7 +24,7 @@ class Settings(BaseSettings):
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )
 
-    # Redis settings
+    # ------------------------------------------------- Redis
     redis_host: str = "localhost"
     redis_port: int = 6380
 
@@ -35,6 +35,16 @@ class Settings(BaseSettings):
     @property
     def redis_stream_key(self) -> str:
         return "soop:chats"
+
+    # 온디맨드 채팅 수집 큐. API가 넣고 collector 워커가 꺼낸다.
+    @property
+    def chat_job_queue_key(self) -> str:
+        return "soop:chat_jobs"
+
+    # 큐에 있거나 수집 중인 vod_id 집합. 중복 요청 방지용.
+    @property
+    def chat_job_pending_key(self) -> str:
+        return "soop:chat_jobs:pending"
 
 
 settings = Settings()

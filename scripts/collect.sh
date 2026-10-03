@@ -2,7 +2,7 @@
 # collector 수동 실행 스크립트.
 
 # 사용 예:
-# timeout -s INT -k 30 180
+# timeout -s INT -k 30 800
 # docker compose exec collector scripts/collect.sh vods
 # docker compose exec collector scripts/collect.sh vods --bid <bid>
 # docker compose exec collector scripts/collect.sh vods --retry

@@ -142,18 +142,32 @@ async def collect_part(
             try:
                 xml = await get_vod_chat(chat_url, start_time=start)
             except httpx.HTTPError as e:
-                logger.warning(
-                    "[RETRY] vod_id=%d file_order=%d t=%d 조회 실패: %s",
-                    vod_id, file_order, start, e,
+                # 파트 끝 몇 초만 남은 마지막 구간은 SOOP이 채팅 데이터를 안 만들어 404를 준다.
+                # 받을 채팅이 없는 것으로 보고 이 파트를 완료 처리한다.
+                is_tail_404 = (
+                    isinstance(e, httpx.HTTPStatusError)
+                    and e.response.status_code == 404
+                    and part_seconds - start < chat_duration
                 )
-                # 쿨다운용. 진행 위치는 그대로 두고 updated_at만 갱신한다.
+                if is_tail_404:
+                    logger.info(
+                        "[OK] vod_id=%d file_order=%d t=%d 마지막 구간 404. 완료 처리",
+                        vod_id, file_order, start,
+                    )
+                else:
+                    logger.warning(
+                        "[RETRY] vod_id=%d file_order=%d t=%d 조회 실패: %s",
+                        vod_id, file_order, start, e,
+                    )
+                # 실패면 쿨다운용으로 진행 위치는 그대로 두고 updated_at만 갱신하고,
+                # 마지막 구간 404면 done으로 기록한다.
                 await conn.execute(
                     PROGRESS_SQL,
                     {
                         "vod_id": vod_id,
                         "file_order": file_order,
                         "last_start_time": start,
-                        "done": False,
+                        "done": is_tail_404,
                     },
                 )
                 return total
