@@ -1,40 +1,36 @@
-"""SOOP 라이브 채팅 웹소켓 수집 모듈.
+"""SOOP 라이브 채팅 클라이언트.
 
-방송 정보를 조회하고, 해당 정보를 바탕으로 채팅 서버에 웹소켓으로 접속한다.
-수신한 raw 채팅 패킷을 파싱해 async generator로 흘려보낸다.
-파이프라인상의 진입점으로, producer가 이 모듈의 stream_soop_chats()를 소비한다.
+호출부가 넘겨준 접속 정보(shared.get_live_info의 결과)로 채팅 서버에 웹소켓으로 접속하고,
+채팅 패킷을 받아 async generator로 흘려보낸다.
+
+종료 계약
+---------
+- 방송이 끝나면(0007) -> 그냥 끝난다(return).
+- 연결이 끊기거나 RECV_TIMEOUT 동안 아무것도 안 오면 -> 예외 전파.
+    재접속할지는 호출부(collector)가 정한다.
 """
 
 import asyncio
+import logging
 import uuid
 from collections.abc import AsyncGenerator
 from typing import Any
 
-import httpx
 import websockets
 from websockets.asyncio.client import ClientConnection
 
-URL = "https://live.sooplive.com/afreeca/player_live_api.php"
+
+logger = logging.getLogger(__name__)
+
+SVC_CHAT = b"0005"
+SVC_BROAD_END = b"0007"
+
+PING_INTERVAL = 60  # 초
+# 이 시간 동안 패킷이 하나도 안 오면 연결이 죽은 것으로 본다.
+RECV_TIMEOUT = 300  # 초
 
 
-async def get_soop_broad_info(bid: str) -> dict[str, Any]:
-    """
-    스트리머 id, 채팅 도메인 등이 들어있는 soop 방송 정보 가져오기.
-    채팅을 수신하는 데에는 헤더, 쿠키, 파라미터가 필요하지 않고 스트리머의 id만 있으면 된다.
-    """
-    data = {
-        "bid": bid,
-    }
-
-    async with httpx.AsyncClient() as client:
-        # soop이 form 형식으로 받아서 "json=" 대신 "data="으로 넘겨줌
-        resp = await client.post(URL, data=data)
-    resp.raise_for_status()
-    info: dict[str, Any] = resp.json().get("CHANNEL", {})
-    return info
-
-
-def make_soop_chat_ws_packet(info: dict[str, Any]) -> tuple[bytes, bytes, bytes]:
+def _make_packets(info: dict[str, Any]) -> tuple[bytes, bytes, bytes]:
     """soop 채팅 소켓 연결에 필요한 패킷 생성
 
     ws 연결에 필요한 요청은 총 세 가지
@@ -88,25 +84,23 @@ def make_soop_chat_ws_packet(info: dict[str, Any]) -> tuple[bytes, bytes, bytes]
     return connect_packet, join_packet, ping_packet
 
 
-async def ping_loop(ws: ClientConnection, ping_packet: bytes) -> None:
+async def _ping_loop(ws: ClientConnection, ping_packet: bytes) -> None:
     """soop 채팅 소켓에서 1분마다 보내는 연결 유지 신호를 모방함."""
     while True:
-        await asyncio.sleep(60)
+        await asyncio.sleep(PING_INTERVAL)
         await ws.send(ping_packet)
 
 
-async def stream_soop_chats(bid: str) -> AsyncGenerator[list[bytes]]:
-    info = await get_soop_broad_info(bid)
-    if info.get("RESULT") != 1:
-        print("방송 중이 아닙니다.")
-        return
+async def stream_live_chats(bid: str, info: dict[str, Any]) -> AsyncGenerator[list[str]]:
+    """채팅 한 건마다 parts(문자열 리스트)를 내보낸다.
+
+    패킷 맨 앞의 헤더(ESC, TAB, 서비스 코드 등)는 빼고 내보낸다.
+    그래서 parts[0]이 메시지, parts[1]이 유저 id, parts[5]가 닉네임이다.
+    """
 
     strmr_nick = info["BJNICK"]
-    chdomain = info["CHDOMAIN"]
-    chpt = info["CHPT"]
-    socket_url = f"wss://{chdomain}:{int(chpt) + 1}/Websocket/{bid}"
-
-    connect_packet, join_packet, ping_packet = make_soop_chat_ws_packet(info)
+    socket_url = f"wss://{info['CHDOMAIN']}:{int(info['CHPT']) + 1}/Websocket/{bid}"
+    connect_packet, join_packet, ping_packet = _make_packets(info)
 
     async with websockets.connect(
         socket_url,
@@ -120,49 +114,60 @@ async def stream_soop_chats(bid: str) -> AsyncGenerator[list[bytes]]:
         await asyncio.sleep(1)
         await ws.send(join_packet)
 
-        print(f"{strmr_nick}님의 채팅을 수신합니다.")
+        logger.info("bid=%s %s님의 채팅 수신 시작", bid, strmr_nick)
 
         # 변수에 담지 않으면 약한 참조 -> 가비지 컬렉터에 의해 작업이 종료될 가능성 있음.
-        ping_task = asyncio.create_task(ping_loop(ws, ping_packet))
+        ping_task = asyncio.create_task(_ping_loop(ws, ping_packet))
 
         try:
             while True:
-                raw = await ws.recv()  # receive
+                async with asyncio.timeout(RECV_TIMEOUT):
+                    raw = await ws.recv()
                 if not isinstance(raw, bytes):
                     continue
-                parts = raw.split(b"\x0c")
 
                 svc = raw[2:6]  # ESC, TAB 바로 뒤에 오는 서비스 코드 추출
 
-                if svc == b"0005":
-                    yield parts
+                if svc == SVC_CHAT:
+                    parts = raw.split(b"\x0c")[1:]
+                    yield [p.decode(errors="replace") for p in parts]
 
-                elif svc == b"0007":
-                    print(f"{strmr_nick}님의 방송이 종료되었습니다.")
-                    break
+                elif svc == SVC_BROAD_END:
+                    logger.info("bid=%s %s님의 방송 종료", bid, strmr_nick)
+                    return
 
         finally:
             ping_task.cancel()
+            # cancel만 하고 끝내면 핑 태스크가 정리되기 전에 함수가 끝난다.
+            # gather로 정리가 끝날 때까지 기다림.
+            await asyncio.gather(ping_task, return_exceptions=True)
 
 
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser()
+    from app.core.log import setup_logging
+    from app.core.soop_clients.live_clients.shared import aclose, get_live_info
 
-    async def _test() -> None:
-        parser.add_argument("--raw", action="store_true")
-        parser.add_argument("bid")
-        arg = parser.parse_args()
-        if not arg.raw:
-            async for parts in stream_soop_chats(arg.bid):
-                chat, nick = parts[1].decode(), parts[6].decode()
-                print(f"{nick}: {chat}")
-        else:
-            async for parts in stream_soop_chats(arg.bid):
-                print(parts)
+    async def _main(bid: str, raw: bool) -> None:
+        try:
+            status, info = await get_live_info(bid)
+            if info is None:
+                print(f"볼 수 없는 방송입니다. ({status})")
+                return
+
+            async for parts in stream_live_chats(bid, info):
+                print(parts if raw else f"{parts[5]}: {parts[0]}")
+        finally:
+            await aclose()
+
+    setup_logging()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--raw", action="store_true")
+    parser.add_argument("bid")
+    args = parser.parse_args()
 
     try:
-        asyncio.run(_test())
+        asyncio.run(_main(args.bid, args.raw))
     except KeyboardInterrupt:
         print("채팅 수신 종료")

@@ -46,5 +46,13 @@ class Settings(BaseSettings):
     def chat_job_pending_key(self) -> str:
         return "soop:chat_jobs:pending"
 
+    # 라이브 요약(해시).
+    def summary_key(bid: str) -> str:
+        return f"soop:live:{bid}:summary"
+
+    # 라이브 채팅(스트림).
+    def chats_key(bid: str) -> str:
+        return f"soop:live:{bid}:chats"
+
 
 settings = Settings()
