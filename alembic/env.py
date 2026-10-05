@@ -1,7 +1,6 @@
 import asyncio
 from logging.config import fileConfig
 from datetime import datetime
-from zoneinfo import ZoneInfo
 
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
@@ -11,6 +10,7 @@ from alembic import context
 
 from app.core.config import settings
 from app.core.db import Base
+from app.utils.tz import KST
 import app.models  # noqa: F401  모델을 Base.metadata에 등록시키는 용도
 
 
@@ -68,7 +68,7 @@ def run_migrations_offline() -> None:
 def process_revision_directives(context, revision, directives):
     """새 마이그레이션의 번호를 랜덤 대신 '연월일_시분'으로 만든다. 예: 261001_1005"""
     directives[0].rev_id = (
-        datetime.now(ZoneInfo("Asia/Seoul")).strftime("%y%m%d_%H%M")
+        datetime.now(KST).strftime("%y%m%d_%H%M")
     )
 
 

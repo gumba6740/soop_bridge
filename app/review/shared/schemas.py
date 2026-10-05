@@ -17,14 +17,15 @@ model_validator에서 media_code 로 평탄화한다.
 from datetime import datetime
 import logging
 from typing import Any
-from zoneinfo import ZoneInfo
+
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from app.utils.tz import KST
 
 logger = logging.getLogger(__name__)
 
 
-KST = ZoneInfo("Asia/Seoul")
+
 
 def _to_kst(v: datetime | None) -> datetime | None:
     """pg에 datetime 삽입을 위해 aware하게 만듦"""
