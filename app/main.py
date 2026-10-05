@@ -2,8 +2,7 @@ from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse
 
-from app.live.routers import router as chat_router
-from app.review.api.routers import router as vod_router
+from app.review.api.routers import router as review_router
 from app.core.exc import BaseAppException, exception_handler
 from app.core.lifespan import lifespan
 from app.core.log import setup_logging
@@ -14,8 +13,7 @@ setup_logging()
 
 app = FastAPI(lifespan=lifespan)
 
-app.include_router(chat_router)
-app.include_router(vod_router)
+app.include_router(review_router)
 
 
 # Exception Handler

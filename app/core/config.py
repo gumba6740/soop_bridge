@@ -32,10 +32,6 @@ class Settings(BaseSettings):
     def redis_url(self) -> str:
         return f"redis://{self.redis_host}:{self.redis_port}"
 
-    @property
-    def redis_stream_key(self) -> str:
-        return "soop:chats"
-
     # 온디맨드 채팅 수집 큐. API가 넣고 collector 워커가 꺼낸다.
     @property
     def chat_job_queue_key(self) -> str:
@@ -47,11 +43,11 @@ class Settings(BaseSettings):
         return "soop:chat_jobs:pending"
 
     # 라이브 요약(해시).
-    def summary_key(bid: str) -> str:
+    def summary_key(self, bid: str) -> str:
         return f"soop:live:{bid}:summary"
 
     # 라이브 채팅(스트림).
-    def chats_key(bid: str) -> str:
+    def chats_key(self, bid: str) -> str:
         return f"soop:live:{bid}:chats"
 
 
