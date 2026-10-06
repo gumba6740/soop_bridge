@@ -35,8 +35,6 @@ temp/
 /sqls/*
 !/sqls/schemas.sql
 
-/scripts/pack.py
-
 /app/review/zzresult/
 /app/review/discard/
 
