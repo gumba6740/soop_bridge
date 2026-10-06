@@ -7,6 +7,7 @@ redis 키
 ---------
 - soop:live:{bid}:summary  (해시, 라이브 요약) 방송 중일 때만 존재. 끝나면 지운다.
     방송 시작 때: bno, nick, title, hls_sd, hls_hd
+    0007 뒤 재접속 때: hls_sd, hls_hd (송출이 다시 시작되면 주소가 바뀔 수 있다)
     DETAIL_INTERVAL마다: title, started_at, viewers, viewers_at
 - soop:live:{bid}:chats (스트림) 채팅 한 건 = 항목 하나. 필드는 parts(JSON) 하나.
     최근 CHAT_MAXLEN개만 유지. 방송이 끝나면 CHAT_TTL_AFTER_END 뒤에 사라진다.
@@ -17,7 +18,7 @@ redis 키
 채팅 수신이 끝나면 접속 정보를 다시 조회해서 RESULT가 1이 아닐 때만 종료로 본다.
 아직 방송 중이면 바로 다시 접속한다.
 방송 중에 연령 제한(RESULT -6)으로 바뀌면 종료로 보지 않고,
-summary를 둔 채 풀릴 때까지 기다린다.
+summary를 둔 채 마지막으로 받은 접속 정보로 다시 접속한다.
 """
 
 import asyncio
@@ -39,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 
 POLL_INTERVAL = 60               # 방송 중이 아닐 때 다시 확인하는 간격(초)
-RETRY_DELAY = 5                  # 에러(연결 끊김 등) 뒤 다시 시도하기까지(초)
+RETRY_DELAY = 20                  # 에러(연결 끊김 등) 뒤 다시 시도하기까지(초)
 DETAIL_INTERVAL = 60             # 방송 중일 때 시청자 수 등을 갱신하는 간격(초)
 CHAT_MAXLEN = 200                # 스트림에 남길 최근 채팅 수 (대략)
 CHAT_TTL_AFTER_END = 600         # 방송이 끝난 뒤 채팅 스트림을 남겨둘 시간(초)
@@ -52,13 +53,19 @@ def _kst_iso(text: str) -> str:
     return dt.isoformat(timespec="seconds")
 
 
-async def on_start(r: Redis, bid: str, info: dict[str, Any]) -> None:
-    """방송이 시작됐거나 BNO가 바뀌었을 때. summary를 새로 쓴다."""
-    mapping = {
-        "bno": str(info.get("BNO", "")),
-        "nick": str(info.get("BJNICK", "")),
-        "title": str(info.get("TITLE", "")),
-    }
+def _tag_mapping(info: dict[str, Any]) -> dict[str, str]:
+    """접속 정보의 태그. 언어, 카테고리, 해시태그 순으로 합쳐 JSON 문자열로 넣는다."""
+    tags = [
+        *(info.get("LANG_TAGS") or []),
+        *(info.get("CATEGORY_TAGS") or []),
+        *(info.get("HASH_TAGS") or []),
+    ]
+    return {"tags": json.dumps(tags, ensure_ascii=False)}
+
+
+async def _hls_mapping(bid: str, info: dict[str, Any]) -> dict[str, str]:
+    """VIDEO_QUALITIES의 재생 주소. 받지 못한 화질은 빠진다."""
+    mapping: dict[str, str] = {}
     for quality in VIDEO_QUALITIES:
         try:
             url = await get_hls_url(bid, info, quality)
@@ -68,6 +75,18 @@ async def on_start(r: Redis, bid: str, info: dict[str, Any]) -> None:
             url = None
         if url:
             mapping[f"hls_{quality}"] = url
+    return mapping
+
+
+async def on_start(r: Redis, bid: str, info: dict[str, Any]) -> None:
+    """방송이 시작됐거나 BNO가 바뀌었을 때. summary를 새로 쓴다."""
+    mapping = {
+        "bno": str(info.get("BNO", "")),
+        "nick": str(info.get("BJNICK", "")),
+        "title": str(info.get("TITLE", "")),
+    }
+    mapping.update(await _hls_mapping(bid, info))
+    mapping.update(_tag_mapping(info))
 
     # 이전 방송의 필드가 섞이지 않도록 초기화.
     async with r.pipeline(transaction=True) as pipe:
@@ -79,6 +98,21 @@ async def on_start(r: Redis, bid: str, info: dict[str, Any]) -> None:
         await pipe.execute()
 
     logger.info("bid=%s %s님 방송 시작 (bno=%s)", bid, mapping["nick"], mapping["bno"])
+
+
+async def refresh_video(r: Redis, bid: str, info: dict[str, Any]) -> None:
+    """같은 방송인데 재접속할 때. summary의 재생 주소만 새로 받아 바꾼다.
+
+    0007 뒤에 송출이 다시 시작되면, BNO와 aid가 같아도 이전 주소가 400이 되는 경우가 있었다.
+    """
+    mapping = await _hls_mapping(bid, info)
+    mapping.update(_tag_mapping(info))
+    hls_fields = [f"hls_{quality}" for quality in VIDEO_QUALITIES]
+    # 받지 못한 화질의 이전 주소가 남지 않도록 지우고 새로 쓴다.
+    async with r.pipeline(transaction=True) as pipe:
+        pipe.hdel(settings.summary_key(bid), *hls_fields)
+        pipe.hset(settings.summary_key(bid), mapping=mapping)
+        await pipe.execute()
 
 
 async def on_end(r: Redis, bid: str) -> None:
@@ -143,17 +177,21 @@ async def watch(r: Redis, bid: str) -> None:
     live: bool | None = None
     bno: str | None = None
     detail_task: asyncio.Task[None] | None = None
+    # 마지막으로 받은 "볼 수 있는" 접속 정보. 연령 제한 중 재접속에 쓴다.
+    last_info: dict[str, Any] | None = None
+    # 0007이나 끊김 뒤의 재접속이면 True. 같은 방송이면 재생 주소를 다시 받는다.
+    reconnect = False
 
     try:
         while True:
             try:
                 status, info = await get_live_info(bid)
 
-                if status == LiveStatus.LOGIN_REQUIRED and live:
-                    # 방송 중에 연령 제한이 켜진 것. 방송은 계속되니 summary는 두고, 풀릴 때까지 기다린다.
-                    logger.info("bid=%s 연령 제한 중. %d초 뒤 재확인", bid, POLL_INTERVAL)
-                    await asyncio.sleep(POLL_INTERVAL)
-                    continue
+                # 방송 중에 연령 제한이 켜진 것. 방송은 계속되니 summary는 두고,
+                # 마지막으로 받은 접속 정보로 다시 접속한다(이전 정보로도 들어갈 수 있다).
+                if status == LiveStatus.LOGIN_REQUIRED and live and last_info is not None:
+                    logger.info("bid=%s 연령 제한 중. 이전 접속 정보로 재접속", bid)
+                    info = last_info
                 # info가 None이면 방송 종료 상태.
                 if info is None:
                     # live가 True면 방금 방송 종료한 상태.
@@ -165,7 +203,7 @@ async def watch(r: Redis, bid: str) -> None:
                         await on_end(r, bid)
                         if live:
                             logger.info("bid=%s 방송 종료", bid)
-                    live, bno = False, None
+                    live, bno, last_info = False, None, None
                     await asyncio.sleep(POLL_INTERVAL)
                     continue
 
@@ -177,15 +215,26 @@ async def watch(r: Redis, bid: str) -> None:
                     detail_task = asyncio.create_task(
                         detail_loop(r, bid, bno), name=f"detail:{bid}"
                     )
+                # 같은 방송의 재접속. 송출이 다시 시작됐으면 재생 주소가 바뀌었을 수 있다.
+                # 연령 제한 중(이전 접속 정보)에는 새 주소를 받을 수 없으니 하지 않는다.
+                elif reconnect and status == LiveStatus.LIVE:
+                    await refresh_video(r, bid, info)
+
+                if status == LiveStatus.LIVE:
+                    last_info = info
+                reconnect = False
+
                 # relay_chats가 끝날 때(0007, 끊김)까지 여기서 기다린다
                 count = await relay_chats(r, bid, info)
                 # 여기 오면 0007을 받은 것. 다음 반복에서 접속 정보를 다시 보고 종료인지 판단한다.
                 logger.info("bid=%s 0007 수신 (%d건). 방송 상태 재확인", bid, count)
                 # 접속하자마자 0007이 반복해서 오는 경우를 대비해 잠깐 쉰다.
                 await asyncio.sleep(1)
+                reconnect = True
 
             except Exception as e:
                 logger.warning("bid=%s %s: %s", bid, type(e).__name__, e)
+                reconnect = True
                 await asyncio.sleep(RETRY_DELAY)
     finally:
         # 취소될 때(collector 종료) detail_task도 같이 정리한다.
