@@ -1829,13 +1829,6 @@ dependencies = [
 ]
 
 [package.dev-dependencies]
-collector = [
-    { name = "httpx" },
-    { name = "psycopg", extra = ["binary"] },
-    { name = "pydantic" },
-    { name = "pydantic-settings" },
-    { name = "redis" },
-]
 dev = [
     { name = "ipython" },
     { name = "locust" },
@@ -1845,6 +1838,20 @@ dev = [
     { name = "pytest-cov" },
     { name = "pytest-sugar" },
     { name = "ruff" },
+]
+live-collector = [
+    { name = "httpx" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "redis" },
+    { name = "websockets" },
+]
+review-collector = [
+    { name = "httpx" },
+    { name = "psycopg", extra = ["binary"] },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "redis" },
 ]
 
 [package.metadata]
@@ -1865,13 +1872,6 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-collector = [
-    { name = "httpx", specifier = ">=0.28.1" },
-    { name = "psycopg", extras = ["binary"], specifier = ">=3.3.4" },
-    { name = "pydantic", specifier = ">=2.13.4" },
-    { name = "pydantic-settings", specifier = ">=2.14.2" },
-    { name = "redis", specifier = ">=8.0.1" },
-]
 dev = [
     { name = "ipython", specifier = ">=9.17.1" },
     { name = "locust", specifier = ">=2.46.2" },
@@ -1881,6 +1881,20 @@ dev = [
     { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "pytest-sugar", specifier = ">=1.1.1" },
     { name = "ruff", specifier = ">=0.15.20" },
+]
+live-collector = [
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "pydantic", specifier = ">=2.13.4" },
+    { name = "pydantic-settings", specifier = ">=2.14.2" },
+    { name = "redis", specifier = ">=8.0.1" },
+    { name = "websockets", specifier = ">=16.0" },
+]
+review-collector = [
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "psycopg", extras = ["binary"], specifier = ">=3.3.4" },
+    { name = "pydantic", specifier = ">=2.13.4" },
+    { name = "pydantic-settings", specifier = ">=2.14.2" },
+    { name = "redis", specifier = ">=8.0.1" },
 ]
 
 [[package]]

@@ -44,11 +44,11 @@ services:
   # VOD/채팅 수집 크론. supercronic이 PID 1로 돌면서 docker/collector.cron 일정대로 실행한다.
   # 로그 확인: docker compose logs -f collector
   # 수동 실행: docker compose exec collector scripts/collect.sh vods --bid <bid>
-  collector:
+  review-collector:
     build:
       context: .
-      dockerfile: docker/collector.Dockerfile
-    container_name: soop_bridge_collector
+      dockerfile: docker/review_collector.Dockerfile
+    container_name: soop_bridge_review_collector
     restart: unless-stopped
     env_file: .env
     environment:
@@ -62,11 +62,11 @@ services:
 
   # 온디맨드 채팅 수집 워커. collector와 같은 이미지에 실행 명령만 다르다.
   # API가 redis 큐에 넣은 vod_id를 꺼내 채팅을 수집한다.
-  collector-worker:
+  review-collector-worker:
     build:
       context: .
-      dockerfile: docker/collector.Dockerfile
-    container_name: soop_bridge_collector_worker
+      dockerfile: docker/review_collector.Dockerfile
+    container_name: soop_bridge_review_collector_worker
     restart: unless-stopped
     command: ["python", "-m", "app.review.collector", "worker"]
     # 컨테이너 stop 시 python을 안전하게 종료하기 위해 init과 SIGINT를 사용
@@ -85,6 +85,32 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+    logging: *default-logging
+
+
+  # 라이브 collector. 방송 중인 스트리머의 채팅, 영상 주소, 방송 현황을 redis에 올린다.
+  # 로그 확인: docker compose logs -f live-collector
+  live-collector:
+    build:
+      context: .
+      dockerfile: docker/live_collector.Dockerfile
+    container_name: soop_bridge_live_collector
+    restart: unless-stopped
+    # 컨테이너 stop 시 python을 안전하게 종료하기 위해 init과 SIGINT를 사용
+    init: true
+    stop_signal: SIGINT
+    # 컨테이너 stop 시 기다리는 시간.
+    stop_grace_period: 10s
+    # postgres는 쓰지 않지만 Settings의 postgres_* 필수값을 채우기 위해 필요하다.
+    env_file: .env
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      TZ: Asia/Seoul
+      RUN_SOURCE: live   # 로그에 [live] 표시
+    depends_on:
       redis:
         condition: service_healthy
     logging: *default-logging

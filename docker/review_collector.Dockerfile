@@ -38,7 +38,7 @@ WORKDIR /app
 
 # 의존성 먼저 설치 (코드만 바뀌면 이 레이어는 캐시를 재사용한다)
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --only-group collector
+RUN uv sync --frozen --only-group review_collector
 
 COPY app ./app
 COPY scripts ./scripts

@@ -32,7 +32,7 @@ dev = [
     "ruff>=0.15.20",
 ]
 
-collector = [
+review_collector = [
     "httpx>=0.28.1",
     "psycopg[binary]>=3.3.4",
     "pydantic>=2.13.4",
@@ -40,6 +40,13 @@ collector = [
     "redis>=8.0.1",
 ]
 
+live_collector = [
+    "httpx>=0.28.1",
+    "pydantic>=2.13.4",
+    "pydantic-settings>=2.14.2",
+    "redis>=8.0.1",
+    "websockets>=16.0",
+]
 
 [tool.ruff]
 line-length = 88

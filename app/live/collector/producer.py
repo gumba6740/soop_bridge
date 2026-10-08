@@ -40,11 +40,12 @@ logger = logging.getLogger(__name__)
 
 
 POLL_INTERVAL = 60               # 방송 중이 아닐 때 다시 확인하는 간격(초)
-RETRY_DELAY = 20                  # 에러(연결 끊김 등) 뒤 다시 시도하기까지(초)
+RETRY_DELAY = 20                 # 에러(연결 끊김 등) 뒤 다시 시도하기까지(초)
 DETAIL_INTERVAL = 60             # 방송 중일 때 시청자 수 등을 갱신하는 간격(초)
 CHAT_MAXLEN = 200                # 스트림에 남길 최근 채팅 수 (대략)
 CHAT_TTL_AFTER_END = 600         # 방송이 끝난 뒤 채팅 스트림을 남겨둘 시간(초)
 VIDEO_QUALITIES = ("sd", "hd")   # 360p, 540p. 웹 경로로는 540p가 최대
+START_STAGGER = 0.5              # watch를 띄우는 간격(초). 요청이 한순간에 몰리지 않게
 
 
 def _kst_iso(text: str) -> str:
@@ -248,6 +249,7 @@ async def watch_all(r: Redis, bids: list[str]) -> None:
         async with asyncio.TaskGroup() as tg:
             for bid in bids:
                 tg.create_task(watch(r, bid), name=f"watch:{bid}")
+                await asyncio.sleep(START_STAGGER)
     finally:
         # 꺼져 있는 동안 "방송 중"으로 남지 않도록 summary를 지운다. 다음 실행에서 다시 쓴다.
         try:

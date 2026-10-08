@@ -32,7 +32,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         await engine.dispose()
 
 
-streamkey = settings.redis_stream_key
+bid = "a"
+streamkey = settings.chats_key(bid)
 
 
 # (entry_id, fields dict)
