@@ -5,9 +5,9 @@
 
 종료 계약
 ---------
-- 방송이 끝나면(0007) -> 그냥 끝난다(return).
+- 스스로 끝나지 않는다(return하지 않는다).
 - 연결이 끊기거나 RECV_TIMEOUT 동안 아무것도 안 오면 -> 예외 전파.
-    재접속할지는 호출부(collector)가 정한다.
+    방송 종료도 이 경로로 알게 된다. 재접속할지는 호출부(collector)가 정한다.
 """
 
 import asyncio
@@ -23,11 +23,13 @@ from websockets.asyncio.client import ClientConnection
 logger = logging.getLogger(__name__)
 
 SVC_CHAT = b"0005"
-SVC_BROAD_END = b"0007"
+SVC_BROAD_STATE = b"0007"
 
 PING_INTERVAL = 60  # 초
 # 이 시간 동안 패킷이 하나도 안 오면 연결이 죽은 것으로 본다.
 RECV_TIMEOUT = 300  # 초
+# 0007 뒤 이 시간(초) 안에 0007이 또 오면 짝으로 보고 연결을 유지한다.
+STATE_PAIR_WINDOW = 1
 
 
 def _make_packets(info: dict[str, Any]) -> tuple[bytes, bytes, bytes]:
@@ -119,10 +121,29 @@ async def stream_live_chats(bid: str, info: dict[str, Any]) -> AsyncGenerator[li
         # 변수에 담지 않으면 약한 참조 -> 가비지 컬렉터에 의해 작업이 종료될 가능성 있음.
         ping_task = asyncio.create_task(_ping_loop(ws, ping_packet))
 
+        loop = asyncio.get_running_loop()
+        # 0007을 만나면 pair deadline에 값이 채워짐.
+        pair_deadline: float | None = None
+
         try:
             while True:
-                async with asyncio.timeout(RECV_TIMEOUT):
-                    raw = await ws.recv()
+                # 평상시 데드라인(패킷이 오지 않을 때 타임아웃을 내는 시간)은 300초.
+                # 0007이 오면 데드라인을 1초로 설정하고, 다음 0007이
+                # 1초 내로 오지 않을 시 타임아웃에러.
+                if pair_deadline is not None:
+                    deadline = pair_deadline
+                else:
+                    deadline = loop.time() + RECV_TIMEOUT
+                try:
+                    async with asyncio.timeout_at(deadline):
+                        raw = await ws.recv()
+                # pair_deadline가 None인 경우는 0007 없이 타임아웃 에러가 난 경우.
+                except TimeoutError:
+                    if pair_deadline is None:
+                        raise
+                    # 짝 없이 마감이 지났다. 예전처럼 끝내고 판단은 호출부에 맡긴다.
+                    logger.info("bid=%s %s님의 방송 상태 변경. 짝 없음, 연결 종료", bid, strmr_nick)  # ← 새로
+                    return
                 if not isinstance(raw, bytes):
                     continue
 
@@ -132,16 +153,21 @@ async def stream_live_chats(bid: str, info: dict[str, Any]) -> AsyncGenerator[li
                     parts = raw.split(b"\x0c")[1:]
                     yield [p.decode(errors="replace") for p in parts]
 
-                elif svc == SVC_BROAD_END:
-                    logger.info("bid=%s %s님의 방송 종료", bid, strmr_nick)
-                    return
+                elif svc == SVC_BROAD_STATE:
+                    logger.info("bid=%s %s님의 방송 상태 변경 raw=%r", bid, strmr_nick, raw)
+                    # 0007을 처음 만난 경우
+                    if pair_deadline is None:
+                        pair_deadline = loop.time() + STATE_PAIR_WINDOW
+                    else:
+                        # 0007을 1초 내에 두번째로 만난 경우.
+                        logger.info("bid=%s %s님의 방송 상태 변경. 짝, 연결 유지", bid, strmr_nick)
+                        pair_deadline = None
 
         finally:
             ping_task.cancel()
             # cancel만 하고 끝내면 핑 태스크가 정리되기 전에 함수가 끝난다.
             # gather로 정리가 끝날 때까지 기다림.
             await asyncio.gather(ping_task, return_exceptions=True)
-
 
 if __name__ == "__main__":
     import argparse
