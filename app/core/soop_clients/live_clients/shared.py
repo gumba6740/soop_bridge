@@ -31,12 +31,14 @@ LIVE_API_COMMON = {
 RESULT_OK = 1
 RESULT_OFFLINE = 0          # 방송 중 아님
 RESULT_LOGIN_REQUIRED = -6  # 연령 제한 방송 등
+RESULT_SUB_PLUS = -14       # 구독플러스 방송
 
 class LiveStatus(StrEnum):
     LIVE = "live"
     OFFLINE = "offline"                 # RESULT 0
     LOGIN_REQUIRED = "login_required"   # RESULT -6. 연령 제한 등
     PASSWORD = "password"               # BPWD == "Y" (추정)
+    SUB_PLUS = "sub_plus"               # RESULT -14.
     UNKNOWN = "unknown"                 # 그 밖의 RESULT
 
 DEFAULT_HEADERS = {
@@ -104,12 +106,16 @@ async def get_live_info(bid: str) -> tuple[LiveStatus, dict[str, Any] | None]:
 
     result = int(channel.get("RESULT", 0))
     if result == RESULT_LOGIN_REQUIRED:
-        logger.info("[PERM] bid=%s 로그인이 필요한 방송", bid)
+        logger.debug("[PERM] bid=%s 로그인이 필요한 방송", bid)
         return LiveStatus.LOGIN_REQUIRED, None
     if result == RESULT_OFFLINE:
         # collector가 주기적으로 확인하면 계속 찍히므로 debug.
         logger.debug("[PERM] bid=%s 방송 중이 아님", bid)
         return LiveStatus.OFFLINE, None
+    if result == RESULT_SUB_PLUS:
+        # 구독자 전용이라 볼 수 없다. collector가 60초마다 확인하므로 debug.
+        logger.debug("[PERM] bid=%s 구독플러스 방송", bid)
+        return LiveStatus.SUB_PLUS, None
     if result != RESULT_OK:
         logger.warning("[PERM] bid=%s 알 수 없는 RESULT=%d", bid, result)
         return LiveStatus.UNKNOWN, None
