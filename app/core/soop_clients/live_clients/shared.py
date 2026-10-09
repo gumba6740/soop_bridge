@@ -10,6 +10,7 @@ chat_client와 vod_client, broad_client가 같이 쓰는 것들:
 from enum import StrEnum
 import logging
 from typing import Any
+from collections import Counter
 
 import httpx
 
@@ -59,8 +60,16 @@ def get_client() -> httpx.AsyncClient:
             limits=httpx.Limits(max_keepalive_connections=10, max_connections=20),
             transport=httpx.AsyncHTTPTransport(retries=2),
             follow_redirects=True,
+            event_hooks={"request": [_count_request]},
         )
     return _client
+
+
+# SOOP에 보낸 요청 수. 주소의 마지막 부분별로 센다. 읽고 비우는 건 collector가 한다.
+request_counts: Counter[str] = Counter()
+
+async def _count_request(request: httpx.Request) -> None:
+    request_counts[request.url.path.rsplit("/", 1)[-1]] += 1
 
 
 async def aclose() -> None:

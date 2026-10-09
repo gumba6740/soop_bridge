@@ -23,6 +23,7 @@ from typing import Any
 
 import websockets
 from websockets.asyncio.client import ClientConnection
+from app.core.soop_clients.live_clients.shared import request_counts
 
 
 logger = logging.getLogger(__name__)
@@ -107,6 +108,7 @@ async def stream_live_chats(bid: str, info: dict[str, Any]) -> AsyncGenerator[by
     socket_url = f"wss://{info['CHDOMAIN']}:{int(info['CHPT']) + 1}/Websocket/{bid}"
     connect_packet, join_packet, ping_packet = _make_packets(info)
 
+    request_counts["chat_ws"] += 1
     async with websockets.connect(
         socket_url,
         subprotocols=[websockets.Subprotocol("chat")],
@@ -156,13 +158,13 @@ async def stream_live_chats(bid: str, info: dict[str, Any]) -> AsyncGenerator[by
                     yield raw
 
                 else:
-                    logger.info("bid=%s %s님의 방송 상태 변경 raw=%r", bid, strmr_nick, raw)
+                    logger.debug("bid=%s %s님의 방송 상태 변경 raw=%r", bid, strmr_nick, raw)
                     # 0007을 처음 만난 경우
                     if pair_deadline is None:
                         pair_deadline = loop.time() + STATE_PAIR_WINDOW
                     else:
                         # 0007을 1초 내에 두번째로 만난 경우.
-                        logger.info("bid=%s %s님의 방송 상태 변경. 짝, 연결 유지", bid, strmr_nick)
+                        logger.debug("bid=%s %s님의 방송 상태 변경. 짝, 연결 유지", bid, strmr_nick)
                         pair_deadline = None
 
         finally:

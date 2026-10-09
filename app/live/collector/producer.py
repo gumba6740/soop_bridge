@@ -38,6 +38,7 @@ from app.core.soop_clients.live_clients.chat_client import stream_live_chats
 from app.core.soop_clients.live_clients.shared import LiveStatus, get_live_info
 from app.core.soop_clients.live_clients.vod_client import get_hls_url
 from app.live.shared.chat_parser import RELAY_SVCS, parse_packet
+from app.core.soop_clients.live_clients.shared import request_counts
 from app.utils.tz import KST
 
 logger = logging.getLogger(__name__)
@@ -50,7 +51,7 @@ CHAT_MAXLEN = 200                # 스트림에 남길 최근 채팅 수 (대략
 CHAT_TTL_AFTER_END = 600         # 방송이 끝난 뒤 채팅 스트림을 남겨둘 시간(초)
 VIDEO_QUALITIES = ("sd", "hd")   # 360p, 540p. 웹 경로로는 540p가 최대
 START_STAGGER = 0.5              # watch를 띄우는 간격(초). 요청이 한순간에 몰리지 않게
-
+STATS_INTERVAL = 60
 
 def _kst_iso(text: str) -> str:
     """SOOP의 시각 문자열("2026-10-04 18:01:57", 한국시간)을 KST가 붙은 ISO 형식으로."""
@@ -252,11 +253,22 @@ async def watch(r: Redis, bid: str) -> None:
         await _stop(detail_task)
 
 
+async def request_stats_loop() -> None:
+    """STATS_INTERVAL마다 그동안 SOOP에 보낸 요청 수를 한 줄로 남긴다."""
+    while True:
+        await asyncio.sleep(STATS_INTERVAL)
+        counts = request_counts.copy()
+        request_counts.clear()
+        detail = ", ".join(f"{k} {n}" for k, n in counts.most_common()) or "-"
+        logger.info("[STATS] SOOP 요청 %d건: %s", counts.total(), detail)
+
+
 async def watch_all(r: Redis, bids: list[str]) -> None:
     """스트리머마다 watch를 띄운다. 끝날 때(취소 포함) summary를 지운다."""
     logger.info("라이브 collector 시작: %s", ", ".join(bids))
     try:
         async with asyncio.TaskGroup() as tg:
+            tg.create_task(request_stats_loop(), name="request_stats")
             for bid in bids:
                 tg.create_task(watch(r, bid), name=f"watch:{bid}")
                 await asyncio.sleep(START_STAGGER)
