@@ -12,8 +12,10 @@
 5. 구간 하나가 끝날 때마다 진행 상태를 커밋한다. 중단 지점이 곧 재개 지점.
 """
 
+from contextlib import asynccontextmanager
 from datetime import datetime
 import logging
+from typing import AsyncGenerator
 
 import httpx
 from psycopg import AsyncConnection
@@ -25,6 +27,8 @@ from app.utils.tz import KST
 logger = logging.getLogger(__name__)
 
 REQUEST_DELAY = 1.0     # 초. 채팅 요청 사이 텀
+TAIL_TOLERANCE = 5.0    # 초. 파트 끝까지 이보다 짧게 남은 구간에서
+                        # 요청이 실패하면 자투리로 보고 완료 처리한다.
 CHAT_COLLECT_SINCE = datetime(2026, 9, 1, tzinfo=KST)  # 크론 자동 수집 기준일.
 
 # ---------------------------------------------------------------- SQL
@@ -120,39 +124,30 @@ async def collect_part(
     Return:
         저장한 채팅 수
     """
-    # 채팅 수집기가 동시에 같은 파트의 채팅을 수집하지 않도록 락.
-    cur = await conn.execute(
-        "SELECT pg_try_advisory_lock(%s, %s)", (vod_id, file_order)
-    )
-    row = await cur.fetchone()
-    if not (row and row[0]):
-        logger.info(
-            "[SKIP] vod_id=%d file_order=%d 다른 작업이 처리 중", vod_id, file_order
-        )
-        return 0
+    async with _part_lock(conn, vod_id, file_order) as ok:
+        if not ok:
+            logger.info(
+                "[SKIP] vod_id=%d file_order=%d 다른 작업이 처리 중", vod_id, file_order
+            )
+            return 0
 
-    total = 0
-    part_seconds = duration_ms / 1000  # 밀리초를 초로 변환
-    start = last_start_time
+        total = 0
+        part_seconds = duration_ms / 1000  # 밀리초를 초로 변환
+        start = last_start_time
 
-    try:
         while start < part_seconds:
             await polite_sleep(REQUEST_DELAY)
 
             try:
                 xml = await get_vod_chat(chat_url, start_time=start)
             except httpx.HTTPError as e:
-                # 파트 끝 몇 초만 남은 마지막 구간은 SOOP이 채팅 데이터를 안 만들어 404를 준다.
-                # 받을 채팅이 없는 것으로 보고 이 파트를 완료 처리한다.
-                is_tail_404 = (
-                    isinstance(e, httpx.HTTPStatusError)
-                    and e.response.status_code == 404
-                    and part_seconds - start < chat_duration
-                )
-                if is_tail_404:
+                remaining = part_seconds - start
+                # 마지막 구간에 채팅 데이터가 없어서 난 에러인지 검사
+                is_tail_missing = _is_tail_missing(e, remaining, chat_duration)
+                if is_tail_missing:
                     logger.info(
-                        "[OK] vod_id=%d file_order=%d t=%d 마지막 구간 404. 완료 처리",
-                        vod_id, file_order, start,
+                        "[TAIL] vod_id=%d file_order=%d t=%d 마지막 구간 응답 없음 (남은 %.1fs). 완료 처리: %s",
+                        vod_id, file_order, start, remaining, e,
                     )
                 else:
                     logger.warning(
@@ -160,14 +155,14 @@ async def collect_part(
                         vod_id, file_order, start, e,
                     )
                 # 실패면 쿨다운용으로 진행 위치는 그대로 두고 updated_at만 갱신하고,
-                # 마지막 구간 404면 done으로 기록한다.
+                # 마지막 구간에 채팅 데이터가 없어서 실패한 경우면 done으로 기록한다.
                 await conn.execute(
                     PROGRESS_SQL,
                     {
                         "vod_id": vod_id,
                         "file_order": file_order,
                         "last_start_time": start,
-                        "done": is_tail_404,
+                        "done": is_tail_missing,
                     },
                 )
                 return total
@@ -208,10 +203,47 @@ async def collect_part(
             "[OK] vod_id=%d file_order=%d 완료 (%d건)", vod_id, file_order, total
         )
         return total
+
+
+@asynccontextmanager
+async def _part_lock(
+    conn: AsyncConnection, vod_id: int, file_order: int
+) -> AsyncGenerator[bool, None]:
+    """파트 단위 advisory lock. 잡았으면 True를 넘기고, 끝나면 푼다.
+
+    채팅 수집기가 동시에 같은 파트의 채팅을 수집하지 않도록 락.
+    """
+    cur = await conn.execute(
+        "SELECT pg_try_advisory_lock(%s, %s)", (vod_id, file_order)
+    )
+    row = await cur.fetchone()
+    acquired = bool(row and row[0])
+    try:
+        yield acquired
     finally:
-        await conn.execute(
-            "SELECT pg_advisory_unlock(%s, %s)", (vod_id, file_order)
-        )
+        if acquired:
+            await conn.execute(
+                "SELECT pg_advisory_unlock(%s, %s)", (vod_id, file_order)
+            )
+
+
+def _is_tail_missing(
+    e: httpx.HTTPError, remaining: float, chat_duration: int
+) -> bool:
+    """요청 실패가 '마지막 구간에 채팅 데이터가 없어서'인지 판단한다.
+
+    파트 끝 몇 초만 남은 마지막 구간은 SOOP이 채팅 데이터를 안 만들어 404를 준다.
+    같은 상황에서 500을 줄 때도 있는데, 500은 일시 오류일 수도 있으므로
+    남은 길이가 TAIL_TOLERANCE 미만인 자투리일 때만 인정한다.
+    """
+    if not isinstance(e, httpx.HTTPStatusError):
+        return False
+    status = e.response.status_code
+    if status == 404:
+        return remaining < chat_duration
+    if status == 500:
+        return remaining < TAIL_TOLERANCE
+    return False
 
 
 async def next_chat_targets(conn: AsyncConnection, limit: int) -> list[int]:
