@@ -42,8 +42,8 @@ services:
     logging: *default-logging
 
   # VOD/채팅 수집 크론. supercronic이 PID 1로 돌면서 docker/collector.cron 일정대로 실행한다.
-  # 로그 확인: docker compose logs -f collector
-  # 수동 실행: docker compose exec collector scripts/collect.sh vods --bid <bid>
+  # 로그 확인: docker compose logs -f review-collector
+  # 수동 실행: docker compose exec review-collector scripts/collect.sh vods --bid <bid>
   review-collector:
     build:
       context: .
@@ -60,7 +60,7 @@ services:
         condition: service_healthy
     logging: *default-logging
 
-  # 온디맨드 채팅 수집 워커. collector와 같은 이미지에 실행 명령만 다르다.
+  # 온디맨드 채팅 수집 워커. review-collector와 같은 이미지에 실행 명령만 다르다.
   # API가 redis 큐에 넣은 vod_id를 꺼내 채팅을 수집한다.
   review-collector-worker:
     build:

@@ -6,10 +6,12 @@
 redis 키
 ---------
 - soop:live:{bid}:summary  (해시, 라이브 요약) 방송 중일 때만 존재. 끝나면 지운다.
-    방송 시작 때: bno, nick, title, hls_sd, hls_hd
-    0007 뒤 재접속 때: hls_sd, hls_hd (송출이 다시 시작되면 주소가 바뀔 수 있다)
+    방송 시작 때: bno, nick, title, hls_sd, hls_hd, tags
+    같은 방송에 재접속할 때: hls_sd, hls_hd, tags (송출이 다시 시작되면 주소가 바뀔 수 있다)
     DETAIL_INTERVAL마다: title, started_at, viewers, viewers_at
-- soop:live:{bid}:chats (스트림) 채팅 한 건 = 항목 하나. 필드는 parts(JSON) 하나.
+- soop:live:{bid}:chats (스트림) 채팅 한 건 = 항목 하나. 필드는 svc(서비스 코드), parts(JSON).
+    채팅(0005) 말고 별풍선, 구독 등도 같은 스트림에 들어간다
+    (app/live/shared/chat_parser의 RELAY_SVCS).
     최근 CHAT_MAXLEN개만 유지. 방송이 끝나면 CHAT_TTL_AFTER_END 뒤에 사라진다.
 
 방송 종료 판단
@@ -17,6 +19,7 @@ redis 키
 채팅 서버는 다시보기를 자를 때도 0007을 보낸다. 그래서 0007만으로 끝내지 않고,
 채팅 수신이 끝나면 접속 정보를 다시 조회해서 RESULT가 1이 아닐 때만 종료로 본다.
 아직 방송 중이면 바로 다시 접속한다.
+0007이 1초 안에 짝으로 오면 chat_client가 연결을 유지해서, 이 판단을 하지 않는다.
 방송 중에 연령 제한(RESULT -6)으로 바뀌면 종료로 보지 않고,
 summary를 둔 채 마지막으로 받은 접속 정보로 다시 접속한다.
 """
@@ -34,6 +37,7 @@ from app.core.soop_clients.live_clients.broad_client import get_broad_detail
 from app.core.soop_clients.live_clients.chat_client import stream_live_chats
 from app.core.soop_clients.live_clients.shared import LiveStatus, get_live_info
 from app.core.soop_clients.live_clients.vod_client import get_hls_url
+from app.live.shared.chat_parser import RELAY_SVCS, parse_packet
 from app.utils.tz import KST
 
 logger = logging.getLogger(__name__)
@@ -159,12 +163,18 @@ async def _stop(task: asyncio.Task[None] | None) -> None:
 
 
 async def relay_chats(r: Redis, bid: str, info: dict[str, Any]) -> int:
-    """채팅을 받아 스트림에 넣는다. 0007이면 끝나고, 끊기면 예외가 올라간다."""
+    """채팅을 받아 스트림에 넣는다. 짝 없는 0007이면 끝나고, 끊기면 예외가 올라간다.
+
+    받은 패킷 중 RELAY_SVCS에 든 것(채팅, 별풍선, 구독 등)만 넣는다.
+    """
     count = 0
-    async for parts in stream_live_chats(bid, info):
+    async for raw in stream_live_chats(bid, info):
+        packet = parse_packet(raw)
+        if packet is None or packet.svc not in RELAY_SVCS:
+            continue
         await r.xadd(
             settings.chats_key(bid),
-            {"parts": json.dumps(parts, ensure_ascii=False)},
+            {"svc": packet.svc, "parts": json.dumps(packet.parts, ensure_ascii=False)},
             maxlen=CHAT_MAXLEN,
             approximate=True,
         )

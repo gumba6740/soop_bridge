@@ -2,12 +2,17 @@
 
 호출부가 넘겨준 접속 정보(shared.get_live_info의 결과)로 채팅 서버에 웹소켓으로 접속하고,
 채팅 패킷을 받아 async generator로 흘려보낸다.
+패킷은 원본 bytes 그대로 넘긴다.
+나누는 일과 어떤 코드를 올릴지는 app/live/shared/chat_parser가 한다.
 
 종료 계약
 ---------
-- 스스로 끝나지 않는다(return하지 않는다).
+- 0007(방송 상태 변경)을 받고 STATE_PAIR_WINDOW 안에 0007이 또 오지 않으면 -> 끝난다(return).
+    종료가 아닐 수도 있으니 방송 상태 판단은 호출부(collector)가 한다.
+- 그 안에 0007이 또 오면(짝) -> 연결을 유지한다.
+    일반 방송인데 짝이 5~7초마다 계속 오는 경우가 있었다. 끊으면 그때마다 재접속하게 된다.
 - 연결이 끊기거나 RECV_TIMEOUT 동안 아무것도 안 오면 -> 예외 전파.
-    방송 종료도 이 경로로 알게 된다. 재접속할지는 호출부(collector)가 정한다.
+    재접속할지는 호출부(collector)가 정한다.
 """
 
 import asyncio
@@ -22,8 +27,7 @@ from websockets.asyncio.client import ClientConnection
 
 logger = logging.getLogger(__name__)
 
-SVC_CHAT = b"0005"
-SVC_BROAD_STATE = b"0007"
+SVC_BROAD_STATE = b"0007"  # 방송 상태 변경. 올리지 않고 연결 유지 판단에만 쓴다
 
 PING_INTERVAL = 60  # 초
 # 이 시간 동안 패킷이 하나도 안 오면 연결이 죽은 것으로 본다.
@@ -93,11 +97,10 @@ async def _ping_loop(ws: ClientConnection, ping_packet: bytes) -> None:
         await ws.send(ping_packet)
 
 
-async def stream_live_chats(bid: str, info: dict[str, Any]) -> AsyncGenerator[list[str]]:
-    """채팅 한 건마다 parts(문자열 리스트)를 내보낸다.
+async def stream_live_chats(bid: str, info: dict[str, Any]) -> AsyncGenerator[bytes]:
+    """받은 패킷을 한 건마다 원본 bytes 그대로 내보낸다. 0007만 빼고 전부.
 
-    패킷 맨 앞의 헤더(ESC, TAB, 서비스 코드 등)는 빼고 내보낸다.
-    그래서 parts[0]이 메시지, parts[1]이 유저 id, parts[5]가 닉네임이다.
+    어떤 코드인지 나누고 거르는 건 호출부가 한다(app/live/shared/chat_parser).
     """
 
     strmr_nick = info["BJNICK"]
@@ -142,18 +145,17 @@ async def stream_live_chats(bid: str, info: dict[str, Any]) -> AsyncGenerator[li
                     if pair_deadline is None:
                         raise
                     # 짝 없이 마감이 지났다. 예전처럼 끝내고 판단은 호출부에 맡긴다.
-                    logger.info("bid=%s %s님의 방송 상태 변경. 짝 없음, 연결 종료", bid, strmr_nick)  # ← 새로
+                    logger.info("bid=%s %s님의 방송 상태 변경. 짝 없음, 연결 종료", bid, strmr_nick)
                     return
                 if not isinstance(raw, bytes):
                     continue
 
                 svc = raw[2:6]  # ESC, TAB 바로 뒤에 오는 서비스 코드 추출
 
-                if svc == SVC_CHAT:
-                    parts = raw.split(b"\x0c")[1:]
-                    yield [p.decode(errors="replace") for p in parts]
+                if svc != SVC_BROAD_STATE:
+                    yield raw
 
-                elif svc == SVC_BROAD_STATE:
+                else:
                     logger.info("bid=%s %s님의 방송 상태 변경 raw=%r", bid, strmr_nick, raw)
                     # 0007을 처음 만난 경우
                     if pair_deadline is None:
@@ -169,11 +171,15 @@ async def stream_live_chats(bid: str, info: dict[str, Any]) -> AsyncGenerator[li
             # gather로 정리가 끝날 때까지 기다림.
             await asyncio.gather(ping_task, return_exceptions=True)
 
+
 if __name__ == "__main__":
     import argparse
 
     from app.core.log import setup_logging
     from app.core.soop_clients.live_clients.shared import aclose, get_live_info
+
+    # 개발용 실행이라 여기서만 app.live를 쓴다. 모듈 본체는 core 밖을 import하지 않는다.
+    from app.live.shared.chat_parser import RELAY_SVCS, SVC_CHAT, parse_packet
 
     async def _main(bid: str, raw: bool) -> None:
         try:
@@ -182,8 +188,17 @@ if __name__ == "__main__":
                 print(f"볼 수 없는 방송입니다. ({status})")
                 return
 
-            async for parts in stream_live_chats(bid, info):
-                print(parts if raw else f"{parts[5]}: {parts[0]}")
+            async for packet in stream_live_chats(bid, info):
+                parsed = parse_packet(packet)
+                if parsed is None or parsed.svc not in RELAY_SVCS:
+                    continue
+                svc, parts = parsed
+                if raw:
+                    print(svc, parts)
+                elif svc == SVC_CHAT:
+                    print(f"{parts[5]}: {parts[0]}")
+                else:
+                    print(f"[{svc}] {parts}")
         finally:
             await aclose()
 
