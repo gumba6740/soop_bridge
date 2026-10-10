@@ -15,7 +15,7 @@
 from contextlib import asynccontextmanager
 from datetime import datetime
 import logging
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Literal
 
 import httpx
 from psycopg import AsyncConnection
@@ -27,8 +27,8 @@ from app.utils.tz import KST
 logger = logging.getLogger(__name__)
 
 REQUEST_DELAY = 1.0     # 초. 채팅 요청 사이 텀
-TAIL_TOLERANCE = 5.0    # 초. 파트 끝까지 이보다 짧게 남은 구간에서
-                        # 요청이 실패하면 자투리로 보고 완료 처리한다.
+CHAT_LIMIT_SECONDS = 18000  # soop이 채팅을 18000초 단위로 관리하기 때문에
+                            # 이것 이후로는 404 대신 500이 온다(확신)
 CHAT_COLLECT_SINCE = datetime(2026, 9, 1, tzinfo=KST)  # 크론 자동 수집 기준일.
 
 # ---------------------------------------------------------------- SQL
@@ -142,30 +142,36 @@ async def collect_part(
                 xml = await get_vod_chat(chat_url, start_time=start)
             except httpx.HTTPError as e:
                 remaining = part_seconds - start
-                # 마지막 구간에 채팅 데이터가 없어서 난 에러인지 검사
-                is_tail_missing = _is_tail_missing(e, remaining, chat_duration)
-                if is_tail_missing:
+                e_type = _classify_error(e, start)
+                if e_type == "empty":
                     logger.info(
-                        "[TAIL] vod_id=%d file_order=%d t=%d 마지막 구간 응답 없음 (남은 %.1fs). 완료 처리: %s",
-                        vod_id, file_order, start, remaining, e,
+                        "[EMPTY] vod_id=%d file_order=%d t=%d 채팅 없는 구간(404). 건너뜀",
+                        vod_id, file_order, start,
                     )
+                    xml = ""
                 else:
-                    logger.warning(
-                        "[RETRY] vod_id=%d file_order=%d t=%d 조회 실패: %s",
-                        vod_id, file_order, start, e,
+                    if e_type == "tail":
+                        logger.info(
+                            "[TAIL] vod_id=%d file_order=%d t=%d 마지막 구간 응답 없음 (남은 %.1fs). 완료 처리: %s",
+                            vod_id, file_order, start, remaining, e,
+                        )
+                    else:
+                        logger.warning(
+                            "[RETRY] vod_id=%d file_order=%d t=%d 조회 실패: %s",
+                            vod_id, file_order, start, e,
+                        )
+                    # 실패면 쿨다운용으로 진행 위치는 그대로 두고 updated_at만 갱신하고,
+                    # 마지막 구간에 채팅 데이터가 없어서 실패한 경우면 done으로 기록한다.
+                    await conn.execute(
+                        PROGRESS_SQL,
+                        {
+                            "vod_id": vod_id,
+                            "file_order": file_order,
+                            "last_start_time": start,
+                            "done": e_type == "tail",
+                        },
                     )
-                # 실패면 쿨다운용으로 진행 위치는 그대로 두고 updated_at만 갱신하고,
-                # 마지막 구간에 채팅 데이터가 없어서 실패한 경우면 done으로 기록한다.
-                await conn.execute(
-                    PROGRESS_SQL,
-                    {
-                        "vod_id": vod_id,
-                        "file_order": file_order,
-                        "last_start_time": start,
-                        "done": is_tail_missing,
-                    },
-                )
-                return total
+                    return total
 
             rows = parse_chat_xml(
                 xml, vod_id=vod_id, file_order=file_order, offset_base=offset_base
@@ -227,23 +233,22 @@ async def _part_lock(
             )
 
 
-def _is_tail_missing(
-    e: httpx.HTTPError, remaining: float, chat_duration: int
-) -> bool:
-    """요청 실패가 '마지막 구간에 채팅 데이터가 없어서'인지 판단한다.
+def _classify_error(
+    e: httpx.HTTPError, start: int
+) -> Literal["empty", "tail", "retry"]:
+    """채팅 요청 실패를 어떻게 처리할지 분류한다.
 
-    파트 끝 몇 초만 남은 마지막 구간은 SOOP이 채팅 데이터를 안 만들어 404를 준다.
-    같은 상황에서 500을 줄 때도 있는데, 500은 일시 오류일 수도 있으므로
-    남은 길이가 TAIL_TOLERANCE 미만인 자투리일 때만 인정한다.
+    empty : 채팅이 하나도 없는 구간. SOOP이 파일을 안 만들어 404를 준다. 건너뛰고 계속.
+    tail  : 5시간(CHAT_LIMIT_SECONDS)을 넘긴 파트의 끝 구간에서 난 500. 파트 완료.
+    retry : 그 외. 쿨다운 후 재시도.
     """
-    if not isinstance(e, httpx.HTTPStatusError):
-        return False
-    status = e.response.status_code
-    if status == 404:
-        return remaining < chat_duration
-    if status == 500:
-        return remaining < TAIL_TOLERANCE
-    return False
+    if isinstance(e, httpx.HTTPStatusError):
+        status = e.response.status_code
+        if status == 404:
+            return "empty"
+        if status == 500 and start >= CHAT_LIMIT_SECONDS:
+            return "tail"
+    return "retry"
 
 
 async def next_chat_targets(conn: AsyncConnection, limit: int) -> list[int]:
