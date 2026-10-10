@@ -32,7 +32,7 @@ SVC_BROAD_STATE = b"0007"  # 방송 상태 변경. 올리지 않고 연결 유�
 
 PING_INTERVAL = 60  # 초
 # 이 시간 동안 패킷이 하나도 안 오면 연결이 죽은 것으로 본다.
-RECV_TIMEOUT = 300  # 초
+RECV_TIMEOUT = 600  # 초
 # 0007 뒤 이 시간(초) 안에 0007이 또 오면 짝으로 보고 연결을 유지한다.
 STATE_PAIR_WINDOW = 1
 

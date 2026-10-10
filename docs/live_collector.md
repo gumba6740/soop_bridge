@@ -373,7 +373,7 @@ watch_all (TaskGroup)
 | `CHAT_TTL_AFTER_END` | 600초 | 방송 종료 후 채팅 스트림을 남겨두는 시간 |
 | `VIDEO_QUALITIES` | `sd`, `hd` | 재생 주소를 만드는 화질 |
 | `PING_INTERVAL` | 60초 | 채팅 핑 간격 (chat_client) |
-| `RECV_TIMEOUT` | 300초 | 이 시간 동안 패킷이 없으면 끊는다 (chat_client) |
+| `RECV_TIMEOUT` | 600초 | 이 시간 동안 패킷이 없으면 끊는다 (chat_client) |
 | `STATE_PAIR_WINDOW` | 1초 | 0007 뒤 이 시간 안에 0007이 또 오면 짝으로 보고 연결을 유지한다 (chat_client) |
 | `START_STAGGER` | 0.5초 | watch를 띄우는 간격. 요청이 한순간에 몰리지 않게 |
 
