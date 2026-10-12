@@ -176,3 +176,14 @@ class VodView(Base):
         autoincrement=False,
     )
     cnt: Mapped[int] = mapped_column(BigInteger, server_default=text("0"))
+
+
+# -------------------------------------------------------- streamers
+
+class Streamer(Base):
+    """수집 대상 스트리머. 목록은 nick 오름차순으로 읽는다."""
+
+    __tablename__ = "streamers"
+
+    bid: Mapped[str] = mapped_column(Text, primary_key=True)
+    nick: Mapped[str] = mapped_column(Text)
