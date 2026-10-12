@@ -103,14 +103,18 @@ services:
     stop_signal: SIGINT
     # 컨테이너 stop 시 기다리는 시간.
     stop_grace_period: 10s
-    # postgres는 쓰지 않지만 Settings의 postgres_* 필수값을 채우기 위해 필요하다.
+    # 시작할 때 streamers 테이블에서 감시할 bid를 읽는다.
     env_file: .env
     environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       TZ: Asia/Seoul
       RUN_SOURCE: live   # 로그에 [live] 표시
     depends_on:
+      db:
+        condition: service_healthy
       redis:
         condition: service_healthy
     logging: *default-logging

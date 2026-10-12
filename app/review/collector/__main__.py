@@ -1,6 +1,6 @@
 """collector 엔트리포인트.
 
-    python -m app.review.collector vods                    # BID 전체 증분 수집
+    python -m app.review.collector vods                    # streamers 테이블 전체 증분 수집
     python -m app.review.collector vods --bid beadyo97     # 특정 스트리머만
     python -m app.review.collector vods --retry            # 일시 실패분 재시도
     python -m app.review.collector vods --sweep --bid X  # 목록과 DB 대조해 누락분 수집
@@ -29,7 +29,6 @@ from psycopg import AsyncConnection
 
 from app.core.config import settings
 from app.core.log import setup_logging
-from app.core.soop_clients.streamers import BID
 from app.review.collector.chats import collect_vod_chats, next_chat_targets
 from app.review.collector.vods import (
     collect_new_vods,
@@ -65,11 +64,13 @@ async def global_lock(
             await conn.execute("SELECT pg_advisory_unlock(%s)", (key,))
 
 
-def _targets(bid: str | None) -> list[tuple[str, str]]:
-    """(닉네임, bid) 목록. bid를 주면 그 하나만, 없으면 BID 전체."""
+async def _targets(conn: AsyncConnection, bid: str | None) -> list[tuple[str, str]]:
+    """(닉네임, bid) 목록. bid를 주면 그 하나만, 없으면 streamers 테이블 전체."""
+    cur = await conn.execute("SELECT nick, bid FROM streamers")
+    rows: list[tuple[str, str]] = [(n, b) for n, b in await cur.fetchall()]
     if bid is None:
-        return list(BID.items())
-    nick = next((n for n, b in BID.items() if b == bid), bid)
+        return rows
+    nick = next((n for n, b in rows if b == bid), bid)
     return [(nick, bid)]
 
 
@@ -88,7 +89,7 @@ async def run_vods(
             logger.info("=== 재시도 완료: %d건 저장 ===", n)
             return
 
-        for nick, b in _targets(bid):
+        for nick, b in await _targets(conn, bid):
             logger.info("=== %s (%s) 시작%s ===", nick, b, " [sweep]" if sweep else "")
             try:
                 # saved: 새로 저장된 VOD 수
@@ -140,7 +141,7 @@ def _build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     p = sub.add_parser("vods", help="VOD 메타 + 상세 수집")
-    p.add_argument("--bid", help="이 스트리머만 수집 (없으면 BID 전체)")
+    p.add_argument("--bid", help="이 스트리머만 수집 (없으면 streamers 테이블 전체)")
     mode = p.add_mutually_exclusive_group()
     mode.add_argument("--retry", action="store_true", help="일시 실패분만 재시도")
     mode.add_argument(
