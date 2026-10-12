@@ -12,7 +12,7 @@ redis 키
 - soop:live:{bid}:chats (스트림) 채팅 한 건 = 항목 하나. 필드는 type, data(JSON).
     다시보기 채팅과 같은 type 이름, 같은 data 키다(docs/chat_types.md).
     채팅 말고 이모티콘, 별풍선, 구독도 같은 스트림에 들어간다
-    (app/live/shared/chat_parser의 CONVERTERS).
+    (app/broadcast/live/shared/chat_parser의 CONVERTERS).
     최근 CHAT_MAXLEN개만 유지. 방송이 끝나면 CHAT_TTL_AFTER_END 뒤에 사라진다.
 
 방송 종료 판단
@@ -38,7 +38,7 @@ from app.core.soop_clients.live_clients.broad_client import get_broad_detail
 from app.core.soop_clients.live_clients.chat_client import stream_live_chats
 from app.core.soop_clients.live_clients.shared import LiveStatus, get_live_info
 from app.core.soop_clients.live_clients.vod_client import get_hls_url
-from app.live.shared.chat_parser import parse_packet, to_chat
+from app.broadcast.live.shared.chat_parser import parse_packet, to_chat
 from app.core.soop_clients.live_clients.shared import request_counts
 from app.utils.tz import KST
 

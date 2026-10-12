@@ -5,13 +5,13 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 
 from app.core.deps import DBDep, RDep
-from app.review.api.schemas.chat_schemas import ChatWindowOut
-from app.review.api.schemas.vod_schemas import (
+from app.broadcast.review.api.schemas.chat_schemas import ChatWindowOut
+from app.broadcast.review.api.schemas.vod_schemas import (
     StreamerOut,
     VodDetailOut,
     VodListOut,
 )
-from app.review.api.services import chat_services, vod_services
+from app.broadcast.review.api.services import chat_services, vod_services
 
 router = APIRouter(tags=["review"])
 

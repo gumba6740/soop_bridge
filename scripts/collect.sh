@@ -18,8 +18,8 @@ export RUN_SOURCE=manual    # 로그에 [manual] 표시 (setup_logging이 읽는
 
 if [ -w /proc/1/fd/1 ]; then
     # 터미널 + 도커 로그.
-    python -m app.review.collector "$@" 2>&1 | tee /proc/1/fd/1
+    python -m app.broadcast.review.collector "$@" 2>&1 | tee /proc/1/fd/1
 else
     # 터미널에만 찍히고 로그는 안 찍힘.
-    python -m app.review.collector "$@"
+    python -m app.broadcast.review.collector "$@"
 fi

@@ -68,7 +68,7 @@ services:
       dockerfile: docker/review_collector.Dockerfile
     container_name: soop_bridge_review_collector_worker
     restart: unless-stopped
-    command: ["python", "-m", "app.review.collector", "worker"]
+    command: ["python", "-m", "app.broadcast.review.collector", "worker"]
     # 컨테이너 stop 시 python을 안전하게 종료하기 위해 init과 SIGINT를 사용
     init: true
     stop_signal: SIGINT

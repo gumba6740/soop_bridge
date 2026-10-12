@@ -35,12 +35,9 @@ temp/
 /sqls/*
 !/sqls/schemas.sql
 
-/app/review/zzresult/
-/app/review/discard/
+/app/broadcast/review/zzresult/
+/app/broadcast/review/discard/
 
-
-# dockerignore에서 주의
-/app/core/soop_clients/streamers.py
 
 #
 /tests/

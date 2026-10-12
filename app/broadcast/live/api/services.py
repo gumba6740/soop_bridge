@@ -9,11 +9,10 @@ from datetime import datetime
 from redis.asyncio import Redis
 
 from app.core.config import settings
-from app.core.soop_clients.streamers import BID
-from app.live.api.exceptions import LiveNotFound, StreamerNotFound
-from app.live.api.schemas import LiveDetail, LiveItem
+from app.broadcast.live.api.exceptions import LiveNotFound, StreamerNotFound
+from app.broadcast.live.api.schemas import LiveDetail, LiveItem
 from app.core.hub import ChatHub
-from app.chat_rules import public
+from app.broadcast.chat_rules import public
 
 logger = logging.getLogger(__name__)
 

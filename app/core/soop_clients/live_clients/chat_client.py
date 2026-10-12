@@ -3,7 +3,7 @@
 호출부가 넘겨준 접속 정보(shared.get_live_info의 결과)로 채팅 서버에 웹소켓으로 접속하고,
 채팅 패킷을 받아 async generator로 흘려보낸다.
 패킷은 원본 bytes 그대로 넘긴다.
-나누는 일과 어떤 코드를 올릴지는 app/live/shared/chat_parser가 한다.
+나누는 일과 어떤 코드를 올릴지는 app/broadcast/live/shared/chat_parser가 한다.
 
 종료 계약
 ---------
@@ -101,7 +101,7 @@ async def _ping_loop(ws: ClientConnection, ping_packet: bytes) -> None:
 async def stream_live_chats(bid: str, info: dict[str, Any]) -> AsyncGenerator[bytes]:
     """받은 패킷을 한 건마다 원본 bytes 그대로 내보낸다. 0007만 빼고 전부.
 
-    어떤 코드인지 나누고 거르는 건 호출부가 한다(app/live/shared/chat_parser).
+    어떤 코드인지 나누고 거르는 건 호출부가 한다(app/broadcast/live/shared/chat_parser).
     """
 
     strmr_nick = info["BJNICK"]
@@ -180,8 +180,8 @@ if __name__ == "__main__":
     from app.core.log import setup_logging
     from app.core.soop_clients.live_clients.shared import aclose, get_live_info
 
-    # 개발용 실행이라 여기서만 app.live를 쓴다. 모듈 본체는 core 밖을 import하지 않는다.
-    from app.live.shared.chat_parser import RELAY_SVCS, SVC_CHAT, parse_packet
+    # 개발용 실행이라 여기서만 app.broadcast.live를 쓴다. 모듈 본체는 core 밖을 import하지 않는다.
+    from app.broadcast.live.shared.chat_parser import RELAY_SVCS, SVC_CHAT, parse_packet
 
     async def _main(bid: str, raw: bool) -> None:
         try:

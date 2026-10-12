@@ -4,11 +4,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.models import Vod
-from app.core.soop_clients.streamers import BID
-from app.review.api.schemas.vod_schemas import (
+from app.broadcast.review.api.schemas.vod_schemas import (
     StreamerOut, VodListOut, VodListItem, VodFileOut, VodDetailOut
 )
-from app.review.api.exceptions import StreamerNotFound, VodNotFound
+from app.broadcast.review.api.exceptions import StreamerNotFound, VodNotFound
 
 from sqlalchemy.ext.asyncio import AsyncSession
 

@@ -20,7 +20,7 @@ import redis.asyncio as redis
 from psycopg import AsyncConnection
 
 from app.core.config import settings
-from app.review.collector.chats import collect_vod_chats
+from app.broadcast.review.collector.chats import collect_vod_chats
 
 logger = logging.getLogger(__name__)
 

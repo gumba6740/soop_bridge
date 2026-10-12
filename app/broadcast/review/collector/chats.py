@@ -21,7 +21,7 @@ import httpx
 from psycopg import AsyncConnection
 from psycopg.types.json import Jsonb
 
-from app.review.shared.chat_parser import parse_chat_xml
+from app.broadcast.review.shared.chat_parser import parse_chat_xml
 from app.core.soop_clients.review_client import get_vod_chat, polite_sleep
 from app.utils.tz import KST
 

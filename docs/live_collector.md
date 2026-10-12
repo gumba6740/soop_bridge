@@ -3,8 +3,8 @@
 SOOP 라이브 방송의 채팅, 영상 주소, 방송 현황을 받아 redis에 올리는 collector의 정리.
 SOOP의 각 응답에 무엇이 들어 있고, 그중 무엇을 왜 쓰는지, 그리고 collector가 그 값을 어떤 순서로 다루는지를 적는다.
 
-- 코드: `app/core/soop_clients/live_clients/`(SOOP과 통신), `app/live/shared/chat_parser.py`(채팅 패킷 나누기, 올릴 코드), `app/live/collector/`(수집 흐름)
-- 실행: `python -m app.live.collector [bid ...]` (bid를 주지 않으면 `streamers.py`의 전원)
+- 코드: `app/core/soop_clients/live_clients/`(SOOP과 통신), `app/broadcast/live/shared/chat_parser.py`(채팅 패킷 나누기, 올릴 코드), `app/broadcast/live/collector/`(수집 흐름)
+- 실행: `python -m app.broadcast.live.collector [bid ...]` (bid를 주지 않으면 `streamers.py`의 전원)
 - 컨테이너: compose의 `live-collector`. `docker compose up -d --build live-collector`로 띄우고, 로그는 `docker compose logs -f live-collector`. 코드를 고치면 `--build`로 다시 띄워야 반영된다
 - 확인 근거: 직접 요청과 `.local/live_test.py` 기록. "확인"이라고 적은 것은 실제 응답으로 본 것이고, "추정"은 아직 근거가 부족한 것이다.
 
@@ -254,7 +254,7 @@ docs/live_chat_packets.md 참고.
 
 ### 0005의 parts
 
-헤더 덩어리(첫 칸)를 뺀 나머지다. 다른 코드도 같은 방식으로 나눈다(`app/live/shared/chat_parser.parse_packet`). chat_client는 원본 bytes를 넘기고, relay_chats가 나눠서 올린다.
+헤더 덩어리(첫 칸)를 뺀 나머지다. 다른 코드도 같은 방식으로 나눈다(`app/broadcast/live/shared/chat_parser.parse_packet`). chat_client는 원본 bytes를 넘기고, relay_chats가 나눠서 올린다.
 
 | 칸 | 내용 |
 |---|---|
@@ -297,7 +297,7 @@ docs/live_chat_packets.md 참고.
 | 항목 | 내용 |
 |---|---|
 | 항목 | 올리는 패킷 한 건 = 항목 하나. 필드는 `svc`(서비스 코드 4자리)와 `parts`(JSON 문자열) |
-| 올리는 코드 | `app/live/shared/chat_parser.RELAY_SVCS`: 0005 채팅, 0018 별풍선, 0087 애드벌룬, 0121 도전미션, 0091 신규 구독, 0093 N개월째 구독, 0108 구독권 선물, 0109 OGQ 이모티콘, 0125 도전미션 정산 명세, 0058 별별랭킹. 모두 같은 스트림, 같은 개수 제한 안에 들어간다 |
+| 올리는 코드 | `app/broadcast/live/shared/chat_parser.RELAY_SVCS`: 0005 채팅, 0018 별풍선, 0087 애드벌룬, 0121 도전미션, 0091 신규 구독, 0093 N개월째 구독, 0108 구독권 선물, 0109 OGQ 이모티콘, 0125 도전미션 정산 명세, 0058 별별랭킹. 모두 같은 스트림, 같은 개수 제한 안에 들어간다 |
 | 길이 | 최근 약 `CHAT_MAXLEN`개만 남긴다(MAXLEN ~) |
 | ID | redis가 붙이는 `밀리초-순번`. 읽는 쪽이 "이 ID 다음부터"로 이어 읽는다 |
 

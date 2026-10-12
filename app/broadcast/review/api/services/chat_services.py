@@ -7,9 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models import Chat, ChatProgress, Vod, VodFile
-from app.review.api.exceptions import VodNotFound
-from app.review.api.schemas.chat_schemas import ChatItem, ChatWindowOut
-from app.chat_rules import public
+from app.broadcast.review.api.exceptions import VodNotFound
+from app.broadcast.review.api.schemas.chat_schemas import ChatItem, ChatWindowOut
+from app.broadcast.chat_rules import public
 
 
 logger = logging.getLogger(__name__)

@@ -3,8 +3,8 @@
 값을 꺼내는 방법(다시보기는 XML 태그, 라이브는 칸 번호)은 각 파서가 따로 하고,
 꺼낸 값을 data로 바꾸는 규칙만 여기 둔다. 두 쪽의 결과가 같아야 하므로 한 곳에서 고친다.
 
-    app/review/shared/chat_parser.py  (다시보기)
-    app/live/shared/chat_parser.py    (라이브)
+    app/broadcast/review/shared/chat_parser.py  (다시보기)
+    app/broadcast/live/shared/chat_parser.py    (라이브)
 
 기존 다시보기 데이터를 옮긴 마이그레이션(alembic 261012_0030)도 같은 규칙을 SQL로 갖고 있다.
 규칙을 바꾸면 이미 저장된 데이터와 달라진다. 근거는 docs/chat_types.md, docs/live_chat_packets.md.

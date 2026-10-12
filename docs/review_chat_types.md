@@ -3,7 +3,7 @@
 채팅 XML에서 루트의 자식 요소 하나가 `chats` 테이블의 한 행이 된다.
 요소 이름은 `type` 컬럼에, 시간 태그 `t`는 `time_offset` 컬럼에 들어가고, 나머지는 타입별 규칙으로 골라 `data`(jsonb)에 담는다.
 
-- 변환 코드: `app/review/shared/chat_parser.py`. 기존 데이터를 옮긴 마이그레이션(alembic `261012_0030`)과 규칙이 같다. 한쪽을 바꾸면 다른 쪽과 결과가 달라진다.
+- 변환 코드: `app/broadcast/review/shared/chat_parser.py`. 기존 데이터를 옮긴 마이그레이션(alembic `261012_0030`)과 규칙이 같다. 한쪽을 바꾸면 다른 쪽과 결과가 달라진다.
 - 각 타입의 **원본 태그** 줄은 XML 자식의 실제 순서다(`t` 제외). 마이그레이션 전의 `parts` 배열이 이 순서였다(`parts[1]`이 첫 태그).
 - `?`는 의미를 아직 확인하지 못한 값이다.
 - 채팅 XML 버전 `1.0.0` 기준. 원본 XML 표본은 `.local/scripts/xml_samples.py`로 받는다.

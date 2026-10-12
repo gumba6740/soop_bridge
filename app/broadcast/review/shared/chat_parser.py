@@ -25,8 +25,8 @@ from collections.abc import Callable
 from typing import Any
 from xml.etree import ElementTree as ET
 
-from app.chat_rules import badge, num, stier, sub, tier, uid
-from app.review.shared.schemas import ChatRow
+from app.broadcast.chat_rules import badge, num, stier, sub, tier, uid
+from app.broadcast.review.shared.schemas import ChatRow
 
 logger = logging.getLogger(__name__)
 

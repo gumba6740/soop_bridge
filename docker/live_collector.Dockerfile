@@ -20,4 +20,4 @@ RUN uv sync --frozen --only-group live_collector
 
 COPY app ./app
 
-CMD ["python", "-m", "app.live.collector"]
+CMD ["python", "-m", "app.broadcast.live.collector"]

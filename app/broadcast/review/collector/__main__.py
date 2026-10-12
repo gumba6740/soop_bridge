@@ -1,14 +1,14 @@
 """collector 엔트리포인트.
 
-    python -m app.review.collector vods                    # streamers 테이블 전체 증분 수집
-    python -m app.review.collector vods --bid beadyo97     # 특정 스트리머만
-    python -m app.review.collector vods --retry            # 일시 실패분 재시도
-    python -m app.review.collector vods --sweep --bid X  # 목록과 DB 대조해 누락분 수집
+    python -m app.broadcast.review.collector vods                    # streamers 테이블 전체 증분 수집
+    python -m app.broadcast.review.collector vods --bid beadyo97     # 특정 스트리머만
+    python -m app.broadcast.review.collector vods --retry            # 일시 실패분 재시도
+    python -m app.broadcast.eview.collector vods --sweep --bid X  # 목록과 DB 대조해 누락분 수집
 
-    python -m app.review.collector chats --count 3         # 크론: 미완료 VOD 최대 3건
-    python -m app.review.collector chats --vod-id 12345    # 수동: 지정 VOD
+    python -m app.broadcast.review.collector chats --count 3         # 크론: 미완료 VOD 최대 3건
+    python -m app.broadcast.review.collector chats --vod-id 12345    # 수동: 지정 VOD
 
-    python -m app.review.collector worker                  # 온디맨드 채팅 수집 워커(상시 실행)
+    python -m app.broadcast.review.collector worker                  # 온디맨드 채팅 수집 워커(상시 실행)
 
 chats는 --count와 --vod-id 중 하나를 반드시 붙여야 한다.
 
@@ -29,13 +29,13 @@ from psycopg import AsyncConnection
 
 from app.core.config import settings
 from app.core.log import setup_logging
-from app.review.collector.chats import collect_vod_chats, next_chat_targets
-from app.review.collector.vods import (
+from app.broadcast.review.collector.chats import collect_vod_chats, next_chat_targets
+from app.broadcast.review.collector.vods import (
     collect_new_vods,
     retry_failures,
     sweep_missing_vods,
 )
-from app.review.collector.worker import run_worker
+from app.broadcast.review.collector.worker import run_worker
 from app.core.soop_clients.review_client import aclose
 
 logger = logging.getLogger(__name__)
