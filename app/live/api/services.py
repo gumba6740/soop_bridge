@@ -13,6 +13,7 @@ from app.core.soop_clients.streamers import BID
 from app.live.api.exceptions import LiveNotFound, StreamerNotFound
 from app.live.api.schemas import LiveDetail, LiveItem
 from app.core.hub import ChatHub
+from app.chat_rules import public
 
 logger = logging.getLogger(__name__)
 
@@ -80,9 +81,14 @@ def _id_key(entry_id: str) -> tuple[int, int]:
     return int(ms), int(seq)
 
 
-def _sse(entry_id: str, fields: dict[str, str]) -> str:
-    """채팅 한 건을 SSE 이벤트로. data는 {"svc": ..., "parts": [...]}."""
-    data = {"svc": fields.get("svc", ""), "parts": json.loads(fields.get("parts", "[]"))}
+def _sse(entry_id: str, fields: dict[str, str]) -> str | None:
+    """채팅 한 건을 SSE 이벤트로. data는 {"type": ..., "data": {...}}.
+
+    예전 모양(svc, parts)으로 들어간 항목이면 None. 스트림이 새 항목으로 바뀌면 사라진다.
+    """
+    if "type" not in fields:
+        return None
+    data = {"type": fields["type"], "data": public(json.loads(fields.get("data", "{}")))}
     return f"id: {entry_id}\nevent: chat\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 

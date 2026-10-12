@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.models import Chat, ChatProgress, Vod, VodFile
 from app.review.api.exceptions import VodNotFound
 from app.review.api.schemas.chat_schemas import ChatItem, ChatWindowOut
+from app.chat_rules import public
 
 
 logger = logging.getLogger(__name__)
@@ -50,7 +51,7 @@ async def get_chats(
     result = await db.execute(stmt)
 
     items = [
-        ChatItem(type=row.type, t=row.time_offset, data=_public(row.data))
+        ChatItem(type=row.type, t=row.time_offset, data=public(row.data))
         for row in result
     ]
 
@@ -137,10 +138,3 @@ async def _enqueue(r: Redis, vod_id: int) -> None:
     if await r.sadd(settings.chat_job_pending_key, str(vod_id)):
         await r.rpush(settings.chat_job_queue_key, str(vod_id))
         logger.info("채팅 수집 요청을 큐에 넣음: vod_id=%d", vod_id)
-
-
-# ------------------------------------------------ 내보낼 data
-
-def _public(data: dict[str, Any]) -> dict[str, Any]:
-    """API로 내보낼 data. 유저 아이디(user_id, from_user_id, to_user_id)를 뺀다."""
-    return {k: v for k, v in data.items() if not k.endswith("user_id")}

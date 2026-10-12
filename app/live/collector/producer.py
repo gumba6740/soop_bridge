@@ -9,9 +9,10 @@ redis 키
     방송 시작 때: bno, nick, title, hls_sd, hls_hd, tags
     같은 방송에 재접속할 때: hls_sd, hls_hd, tags (송출이 다시 시작되면 주소가 바뀔 수 있다)
     DETAIL_INTERVAL마다: title, started_at, viewers, viewers_at
-- soop:live:{bid}:chats (스트림) 채팅 한 건 = 항목 하나. 필드는 svc(서비스 코드), parts(JSON).
-    채팅(0005) 말고 별풍선, 구독 등도 같은 스트림에 들어간다
-    (app/live/shared/chat_parser의 RELAY_SVCS).
+- soop:live:{bid}:chats (스트림) 채팅 한 건 = 항목 하나. 필드는 type, data(JSON).
+    다시보기 채팅과 같은 type 이름, 같은 data 키다(docs/chat_types.md).
+    채팅 말고 이모티콘, 별풍선, 구독도 같은 스트림에 들어간다
+    (app/live/shared/chat_parser의 CONVERTERS).
     최근 CHAT_MAXLEN개만 유지. 방송이 끝나면 CHAT_TTL_AFTER_END 뒤에 사라진다.
 
 방송 종료 판단
@@ -37,7 +38,7 @@ from app.core.soop_clients.live_clients.broad_client import get_broad_detail
 from app.core.soop_clients.live_clients.chat_client import stream_live_chats
 from app.core.soop_clients.live_clients.shared import LiveStatus, get_live_info
 from app.core.soop_clients.live_clients.vod_client import get_hls_url
-from app.live.shared.chat_parser import RELAY_SVCS, parse_packet
+from app.live.shared.chat_parser import parse_packet, to_chat
 from app.core.soop_clients.live_clients.shared import request_counts
 from app.utils.tz import KST
 
@@ -166,16 +167,20 @@ async def _stop(task: asyncio.Task[None] | None) -> None:
 async def relay_chats(r: Redis, bid: str, info: dict[str, Any]) -> int:
     """채팅을 받아 스트림에 넣는다. 짝 없는 0007이면 끝나고, 끊기면 예외가 올라간다.
 
-    받은 패킷 중 RELAY_SVCS에 든 것(채팅, 별풍선, 구독 등)만 넣는다.
+    받은 패킷 중 변환할 줄 아는 것(chat_parser.CONVERTERS: 채팅, 이모티콘, 별풍선, 구독)만
+    다시보기와 같은 {type, data} 모양으로 바꿔 넣는다.
     """
     count = 0
     async for raw in stream_live_chats(bid, info):
         packet = parse_packet(raw)
-        if packet is None or packet.svc not in RELAY_SVCS:
+        if packet is None:
+            continue
+        chat = to_chat(packet)
+        if chat is None:
             continue
         await r.xadd(
             settings.chats_key(bid),
-            {"svc": packet.svc, "parts": json.dumps(packet.parts, ensure_ascii=False)},
+            {"type": chat.type, "data": json.dumps(chat.data, ensure_ascii=False)},
             maxlen=CHAT_MAXLEN,
             approximate=True,
         )
