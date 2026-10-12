@@ -1,4 +1,4 @@
-"""라이브 목록, 방송 현황, 채팅 SSE."""
+"""방송 현황, 채팅 SSE."""
 
 import asyncio
 import json
@@ -7,12 +7,14 @@ from collections.abc import AsyncIterator
 from datetime import datetime
 
 from redis.asyncio import Redis
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.broadcast.live.api.exceptions import LiveNotFound, StreamerNotFound
+from app.broadcast.live.api.exceptions import LiveNotFound
 from app.broadcast.live.api.schemas import LiveDetail, LiveItem
 from app.core.hub import ChatHub
 from app.broadcast.chat_rules import public
+from app.station.services import get_streamer
 
 logger = logging.getLogger(__name__)
 
@@ -21,15 +23,8 @@ EMBED_URL = "https://play.sooplive.com/{bid}/embed"
 INITIAL_CHATS = 10  # SSE를 처음 열었을 때 먼저 보내는 최근 채팅 수
 HEARTBEAT_SEC = 15  # 채팅이 없을 때 연결 유지용 신호를 보내는 간격. 이때 방송 종료도 확인한다
 
-NICK_BY_BID = {bid: nick for nick, bid in BID.items()}
-
 
 # ------------------------------------------------------ 방송 현황
-
-def _check_bid(bid: str) -> None:
-    if bid not in NICK_BY_BID:
-        raise StreamerNotFound()
-
 
 def _to_item(bid: str, s: dict[str, str]) -> LiveItem:
     return LiveItem(
@@ -42,18 +37,8 @@ def _to_item(bid: str, s: dict[str, str]) -> LiveItem:
     )
 
 
-async def list_lives(r: Redis) -> list[LiveItem]:
-    """지금 방송 중인 스트리머. BID 순서대로."""
-    bids = list(NICK_BY_BID)
-    async with r.pipeline(transaction=False) as pipe:
-        for bid in bids:
-            pipe.hgetall(settings.summary_key(bid))
-        summaries: list[dict[str, str]] = await pipe.execute()
-    return [_to_item(bid, s) for bid, s in zip(bids, summaries, strict=True) if s]
-
-
-async def get_live(r: Redis, bid: str) -> LiveDetail:
-    _check_bid(bid)
+async def get_live(db: AsyncSession, r: Redis, bid: str) -> LiveDetail:
+    await get_streamer(db, bid)  # 등록 안 된 bid면 404
     s: dict[str, str] = await r.hgetall(settings.summary_key(bid))
     if not s:
         raise LiveNotFound()
@@ -67,9 +52,9 @@ async def get_live(r: Redis, bid: str) -> LiveDetail:
 
 # -------------------------------------------------------- 채팅 SSE
 
-async def check_live(r: Redis, bid: str) -> None:
+async def check_live(db: AsyncSession, r: Redis, bid: str) -> None:
     """SSE를 열기 전에 확인한다. 응답이 시작된 뒤에는 404를 줄 수 없어서 미리 한다."""
-    _check_bid(bid)
+    await get_streamer(db, bid)  # 등록 안 된 bid면 404
     if not await r.exists(settings.summary_key(bid)):
         raise LiveNotFound()
 
@@ -80,14 +65,9 @@ def _id_key(entry_id: str) -> tuple[int, int]:
     return int(ms), int(seq)
 
 
-def _sse(entry_id: str, fields: dict[str, str]) -> str | None:
-    """채팅 한 건을 SSE 이벤트로. data는 {"type": ..., "data": {...}}.
-
-    예전 모양(svc, parts)으로 들어간 항목이면 None. 스트림이 새 항목으로 바뀌면 사라진다.
-    """
-    if "type" not in fields:
-        return None
-    data = {"type": fields["type"], "data": public(json.loads(fields.get("data", "{}")))}
+def _sse(entry_id: str, fields: dict[str, str]) -> str:
+    """채팅 한 건을 SSE 이벤트로. data는 {"type": ..., "data": {...}}."""
+    data = {"type": fields["type"], "data": public(json.loads(fields["data"]))}
     return f"id: {entry_id}\nevent: chat\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 

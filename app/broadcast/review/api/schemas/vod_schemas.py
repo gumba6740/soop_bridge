@@ -1,5 +1,7 @@
 """vod 리스트, 상세보기 응답용 스키마
 
+VodListItem, VodListOut은 방송국의 다시보기 목록(app/station)이 쓴다.
+
 시간 단위
     duration, total_duration : 밀리초 (DB 그대로)
     offset_base_sec: 초 (플레이어가 초 단위라서)
@@ -11,12 +13,6 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
-
-# ------------------------------------------------ 스트리머
-
-class StreamerOut(BaseModel):
-    bid: str
-    nick: str
 
 # ------------------------------------------------- VOD
 
@@ -53,6 +49,5 @@ class VodFileOut(BaseModel):
 class VodDetailOut(VodListItem):
     """VodListItem를 상속함."""
     bid: str
-    nick: str | None        # streamers.py에 없는 bid면 None
+    nick: str
     files: list[VodFileOut]
-

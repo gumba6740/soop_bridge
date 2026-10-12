@@ -24,7 +24,7 @@ chat_client(core)는 받은 패킷을 원본 bytes로 넘기기만 하고, 나�
 from collections.abc import Callable
 from typing import Any, NamedTuple
 
-from app.chat_rules import badge, num, stier, sub, tier, uid
+from app.broadcast.chat_rules import badge, num, stier, sub, tier, uid
 
 HEADER_START = b"\x1b\t"
 SEP = b"\x0c"

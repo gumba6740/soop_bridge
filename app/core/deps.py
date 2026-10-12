@@ -30,6 +30,9 @@ def get_chat_hub(request: Request) -> ChatHub:
 
 
 DBDep = Annotated[AsyncSession, Depends(get_db)]
+# 응답을 보내기 전에 세션을 닫는다. SSE처럼 응답이 오래 가는 곳에서
+# DB 커넥션을 연결이 끝날 때까지 붙잡고 있지 않게 한다.
+DBFuncDep = Annotated[AsyncSession, Depends(get_db, scope="function")]
 RDep = Annotated[Redis, Depends(get_r)]
 RgDep = Annotated[dict[str, set[WebSocket]], Depends(get_registry)]
 HubDep = Annotated[ChatHub, Depends(get_chat_hub)]

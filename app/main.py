@@ -4,6 +4,7 @@ from fastapi.responses import HTMLResponse
 
 from app.broadcast.review.api.routers import router as review_router
 from app.broadcast.live.api.routers import router as live_router
+from app.station.routers import router as station_router
 from app.core.exc import BaseAppException, exception_handler
 from app.core.lifespan import lifespan
 from app.core.log import setup_logging
@@ -14,6 +15,7 @@ setup_logging()
 
 app = FastAPI(lifespan=lifespan)
 
+app.include_router(station_router)
 app.include_router(review_router)
 app.include_router(live_router)
 

@@ -1,4 +1,4 @@
-"""라이브 목록, 방송 현황 응답용 스키마.
+"""방송 현황 응답용 스키마.
 
 값은 collector가 redis summary에 넣은 것(라이브 요약)이다.
 detail_loop가 돌기 전(방송 감지 직후 몇 초)에는 viewers, started_at, viewers_at이 비어 있을 수 있다.
@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 
 class LiveItem(BaseModel):
-    """홈 화면의 라이브 목록 한 줄."""
+    """방송 현황의 기본 항목. LiveDetail이 상속한다."""
 
     bid: str
     nick: str
