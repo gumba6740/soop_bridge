@@ -181,9 +181,17 @@ if __name__ == "__main__":
     from app.core.soop_clients.live_clients.shared import aclose, get_live_info
 
     # 개발용 실행이라 여기서만 app.broadcast.live를 쓴다. 모듈 본체는 core 밖을 import하지 않는다.
-    from app.broadcast.live.shared.chat_parser import RELAY_SVCS, SVC_CHAT, parse_packet
+    import json
+
+    # 개발용 실행이라 여기서만 app.broadcast.live를 쓴다. 모듈 본체는 core 밖을 import하지 않는다.
+    from app.broadcast.live.shared.chat_parser import parse_packet, to_chat
 
     async def _main(bid: str, raw: bool) -> None:
+        """모든 서비스 코드를 찍는다.
+
+        변환하는 코드(CONVERTERS)는 변환 결과를, 나머지는 칸 그대로.
+        --raw면 변환하는 코드도 칸 그대로 찍는다.
+        """
         try:
             status, info = await get_live_info(bid)
             if info is None:
@@ -192,15 +200,14 @@ if __name__ == "__main__":
 
             async for packet in stream_live_chats(bid, info):
                 parsed = parse_packet(packet)
-                if parsed is None or parsed.svc not in RELAY_SVCS:
+                if parsed is None:
+                    print(f"???? {packet!r}")  # 패킷 모양이 아님
                     continue
-                svc, parts = parsed
-                if raw:
-                    print(svc, parts)
-                elif svc == SVC_CHAT:
-                    print(f"{parts[5]}: {parts[0]}")
+                chat = None if raw else to_chat(parsed)
+                if chat is None:
+                    print(f"{parsed.svc} {parsed.parts}")
                 else:
-                    print(f"[{svc}] {parts}")
+                    print(f"{parsed.svc} {chat.type} {json.dumps(chat.data, ensure_ascii=False)}")
         finally:
             await aclose()
 
