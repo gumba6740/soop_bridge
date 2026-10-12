@@ -124,7 +124,7 @@ class ChatRow(BaseModel):
     """chats 테이블 한 행. chat_parser.py에서 응답 xml을 파싱해서 넣어줌.
 
     time_offset은 영상 파트마다 0으로 초기화되는 값이 아니라, 영상 전체 기준임(초).
-    parts의 인덱스 매핑은 docs/chat_types.md 참고.
+    data의 키는 타입마다 다르다. docs/chat_types.md 참고.
     """
 
     # 파싱을 pydantic에게 맡기지 않고 직접 파싱해서 넣어줌
@@ -134,4 +134,4 @@ class ChatRow(BaseModel):
     file_order: int
     type: str
     time_offset: float
-    parts: list[str]
+    data: dict[str, Any]

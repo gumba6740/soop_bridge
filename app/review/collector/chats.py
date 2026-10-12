@@ -19,6 +19,7 @@ from typing import AsyncGenerator, Literal
 
 import httpx
 from psycopg import AsyncConnection
+from psycopg.types.json import Jsonb
 
 from app.review.shared.chat_parser import parse_chat_xml
 from app.core.soop_clients.review_client import get_vod_chat, polite_sleep
@@ -83,8 +84,8 @@ DELETE_RANGE_SQL = """
 """
 
 INSERT_CHAT_SQL = """
-    INSERT INTO chats (vod_id, file_order, type, time_offset, parts)
-    VALUES (%(vod_id)s, %(file_order)s, %(type)s, %(time_offset)s, %(parts)s)
+    INSERT INTO chats (vod_id, file_order, type, time_offset, data)
+    VALUES (%(vod_id)s, %(file_order)s, %(type)s, %(time_offset)s, %(data)s)
 """
 
 PROGRESS_SQL = """
@@ -189,7 +190,8 @@ async def collect_part(
                 if rows:
                     async with conn.cursor() as cur:
                         await cur.executemany(
-                            INSERT_CHAT_SQL, [r.model_dump() for r in rows]
+                            INSERT_CHAT_SQL,
+                            [{**r.model_dump(), "data": Jsonb(r.data)} for r in rows],
                         )
 
                 start += chat_duration

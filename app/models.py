@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import (
     BigInteger,
@@ -16,7 +17,7 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
@@ -136,9 +137,9 @@ class ChatProgress(Base):
 # ---------------------------------------------------------------- chats
 
 class Chat(Base):
-    """parts의 인덱스 매핑은 docs/chat_types.md 참고.
+    """data의 키는 타입마다 다름. docs/chat_types.md 참고.
 
-    ORM으로 받은 parts는 파이썬 리스트라 0부터, SQL 안에서는 1부터 센다.
+    모르는 타입은 원본 XML 태그 이름을 그대로 키로 쓴다(t 포함).
     """
 
     __tablename__ = "chats"
@@ -158,10 +159,10 @@ class Chat(Base):
     file_order: Mapped[int] = mapped_column(SmallInteger)  # 구간 단위 재삽입에 필요
     type: Mapped[str] = mapped_column(Text)
     time_offset: Mapped[float] = mapped_column(Double)  # float8
-    parts: Mapped[list[str]] = mapped_column(ARRAY(Text))
+    data: Mapped[dict[str, Any]] = mapped_column(JSONB) 
 
 
-# ---------------------------------------------------------------- vod_views
+# ------------------------------------------------------- vod_views
 
 class VodView(Base):
     """우리 서비스에서 집계하는 조회수. SOOP 데이터와 주인이 달라서 분리."""
