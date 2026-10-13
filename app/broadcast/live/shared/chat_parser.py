@@ -15,7 +15,7 @@ chat_client(core)는 받은 패킷을 원본 bytes로 넘기기만 하고, 나�
 
 변환
 ----
-- 다시보기 채팅과 같은 type 이름, 같은 data 키를 쓴다(docs/chat_types.md).
+- 다시보기 채팅과 같은 type 이름, 같은 data 키를 쓴다(docs/review_chat_types.md).
     값을 만드는 규칙(배지, 구독, 아이디 접미사 등)은 app/chat_rules.py(다시보기와 공용)에 있다.
 - CONVERTERS에 있는 서비스 코드만 변환한다. 나머지는 버린다(로그도 남기지 않는다).
 - 칸 번호는 parts 기준(0부터).

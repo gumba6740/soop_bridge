@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 
 class ChatItem(BaseModel):
-    """채팅 한 건. data의 키는 type마다 다르다. docs/chat_types.md 참고.
+    """채팅 한 건. data의 키는 type마다 다르다. docs/review_chat_types.md 참고.
 
     유저 아이디(user_id, from_user_id, to_user_id)는 내보내지 않는다.
     """

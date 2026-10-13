@@ -1,7 +1,7 @@
 """chats_parts_to_data
 
 chats.parts(text[], 값만 순서대로) → chats.data(jsonb, 이름 붙은 값).
-기존 행을 타입별로 변환하고 parts를 지운다. 키 정의는 docs/chat_types.md.
+기존 행을 타입별로 변환하고 parts를 지운다. 키 정의는 docs/review_chat_types.md.
 
 - parts의 칸 번호는 SQL 배열 기준(1부터)이다. parts = XML 요소의 자식 중 t를 뺀 값, 문서 순서.
 - 모르는 타입은 {"parts": [...]}로 그대로 옮긴다. 키를 정할 때 다시 변환한다. (지금은 해당 없음)

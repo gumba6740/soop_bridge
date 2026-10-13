@@ -7,7 +7,7 @@
     app/broadcast/live/shared/chat_parser.py    (라이브)
 
 기존 다시보기 데이터를 옮긴 마이그레이션(alembic 261012_0030)도 같은 규칙을 SQL로 갖고 있다.
-규칙을 바꾸면 이미 저장된 데이터와 달라진다. 근거는 docs/chat_types.md, docs/live_chat_packets.md.
+규칙을 바꾸면 이미 저장된 데이터와 달라진다. 근거는 docs/review_chat_types.md, docs/live_chat_packets.md.
 """
 
 import re

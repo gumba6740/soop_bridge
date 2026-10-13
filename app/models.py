@@ -137,7 +137,7 @@ class ChatProgress(Base):
 # ---------------------------------------------------------------- chats
 
 class Chat(Base):
-    """data의 키는 타입마다 다름. docs/chat_types.md 참고.
+    """data의 키는 타입마다 다름. docs/review_chat_types.md 참고.
 
     모르는 타입은 원본 XML 태그 이름을 그대로 키로 쓴다(t 포함).
     """

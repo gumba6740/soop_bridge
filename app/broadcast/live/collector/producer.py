@@ -10,7 +10,7 @@ redis 키
     같은 방송에 재접속할 때: hls_sd, hls_hd, tags (송출이 다시 시작되면 주소가 바뀔 수 있다)
     DETAIL_INTERVAL마다: title, started_at, viewers, viewers_at
 - soop:live:{bid}:chats (스트림) 채팅 한 건 = 항목 하나. 필드는 type, data(JSON).
-    다시보기 채팅과 같은 type 이름, 같은 data 키다(docs/chat_types.md).
+    다시보기 채팅과 같은 type 이름, 같은 data 키다(docs/review_chat_types.md).
     채팅 말고 이모티콘, 별풍선, 구독도 같은 스트림에 들어간다
     (app/broadcast/live/shared/chat_parser의 CONVERTERS).
     최근 CHAT_MAXLEN개만 유지. 방송이 끝나면 CHAT_TTL_AFTER_END 뒤에 사라진다.
