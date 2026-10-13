@@ -3,9 +3,9 @@
 SOOP 라이브 방송의 채팅, 영상 주소, 방송 현황을 받아 redis에 올리는 collector의 정리.
 SOOP의 각 응답에 무엇이 들어 있고, 그중 무엇을 왜 쓰는지, 그리고 collector가 그 값을 어떤 순서로 다루는지를 적는다.
 
-- 코드: `app/core/soop_clients/live_clients/`(SOOP과 통신), `app/broadcast/live/shared/chat_parser.py`(채팅 패킷 나누기, 올릴 코드), `app/broadcast/live/collector/`(수집 흐름)
-- 실행: `python -m app.broadcast.live.collector [bid ...]` (bid를 주지 않으면 `streamers.py`의 전원)
-- 컨테이너: compose의 `live-collector`. `docker compose up -d --build live-collector`로 띄우고, 로그는 `docker compose logs -f live-collector`. 코드를 고치면 `--build`로 다시 띄워야 반영된다
+- 코드: `app/core/soop_clients/live_clients/`(SOOP과 통신), `app/broadcast/live/shared/chat_parser.py`(채팅 패킷을 나누고, 다시보기 채팅과 같은 모양으로 변환), `app/broadcast/live/collector/`(수집 흐름)
+- 실행: `python -m app.broadcast.live.collector [bid ...]` (bid를 주지 않으면 `streamers` 테이블의 전원. 시작할 때 한 번 읽으니 목록을 바꾸면 다시 띄운다)
+- 컨테이너: compose의 `live-collector`. `docker compose up -d --build live-collector`로 띄우고, 로그는 `docker compose logs -f live-collector`. 코드를 고치면 `--build`로 다시 띄워야 반영된다. 시작할 때 `streamers` 테이블을 읽으므로 redis와 함께 postgres(`db`)도 필요하다
 - 확인 근거: 직접 요청과 `.local/live_test.py` 기록. "확인"이라고 적은 것은 실제 응답으로 본 것이고, "추정"은 아직 근거가 부족한 것이다.
 
 ---
@@ -38,7 +38,7 @@ SOOP의 각 응답에 무엇이 들어 있고, 그중 무엇을 왜 쓰는지, �
 │             │
 │             ├─ 같은 방송의 재접속 → refresh_video: 재생 주소만 다시 발급
 │             │
-│             └─ relay_chats: 채팅 웹소켓 접속 → 채팅, 후원, 구독 패킷마다 XADD
+│             └─ relay_chats: 채팅 웹소켓 접속 → 변환하는 패킷(채팅, 이모티콘, 별풍선, 구독)마다 XADD
 │                    ├─ 0007, 1초 안에 짝 → 연결 유지, 계속 수신
 │                    ├─ 0007, 짝 없음 → 1초 뒤 접속 정보 다시 조회 (종료인지 판단)
 │                    └─ 끊김/600초 무응답 → 20초 뒤 다시 조회
@@ -174,7 +174,7 @@ GET {RMD}/broad_stream_assign.html?return_type=<CDN 매핑값>&broad_key={BNO}-c
 | 방송 종료 후 | 같은 주소가 400(본문은 `Not Found`)이 된다. `#EXT-X-ENDLIST`는 오지 않는다 |
 | 크기 | 540p 조각 약 360KB / 2초 (약 1.4Mbps), 360p 약 230KB / 2초 |
 
-브라우저는 Referer를 바꿀 수 없고 CORS에도 막히므로, 시청자의 브라우저가 이 주소를 직접 재생할 수는 없다. 시청자에게 보여주려면 서버가 받아서 전달(프록시)하거나 SOOP 공식 플레이어를 써야 한다. 이건 API 설계에서 정한다.
+브라우저는 Referer를 바꿀 수 없고 CORS에도 막히므로, 시청자의 브라우저가 이 주소를 직접 재생할 수는 없다. 시청자에게 보여주려면 서버가 받아서 전달(프록시)하거나 SOOP 공식 플레이어를 써야 한다. API는 공식 퍼가기 플레이어 주소(`embed_url`, `https://play.sooplive.com/{bid}/embed`)를 내보낸다. collector가 만드는 재생 주소(`hls_sd`, `hls_hd`)는 지금 API에서 쓰지 않는다. 나중에 직접 재생할 때를 위해 남겨 둔다.
 
 ---
 
@@ -252,22 +252,22 @@ docs/live_chat_packets.md 참고.
 
 `0` 패킷은 종료 때와 일반 방송 때가 바이트까지 같아서, 본문만으로 종료를 가를 수 없다. 그래서 chat_client는 0007 뒤 `STATE_PAIR_WINDOW`(1초) 안에 0007이 또 오면 짝으로 보고 연결을 유지하고, 안 오면 연결을 끝내서 watch가 접속 정보로 판단하게 한다. 짝인지는 값이 아니라 개수로 본다(짝의 모양을 몇 번밖에 못 봐서, 틀렸을 때 재접속이 반복되는 쪽보다 종료를 늦게 아는 쪽을 택했다). 0007에서 바로 끊던 때는 짝이 오는 방송에서 5초마다 재접속했다.
 
-### 0005의 parts
+### 받은 패킷을 올리는 방법
 
-헤더 덩어리(첫 칸)를 뺀 나머지다. 다른 코드도 같은 방식으로 나눈다(`app/broadcast/live/shared/chat_parser.parse_packet`). chat_client는 원본 bytes를 넘기고, relay_chats가 나눠서 올린다.
+chat_client는 0007만 직접 처리하고, 나머지 패킷은 원본 bytes 그대로 넘긴다. relay_chats가 두 단계로 바꿔서 올린다(`app/broadcast/live/shared/chat_parser`).
 
-| 칸 | 내용 |
-|---|---|
-| 0 | 메시지 |
-| 1 | 유저 아이디 |
-| 5 | 닉네임 |
-| 그 밖 | docs/live_chat_packets.md 2절 |
+1. `parse_packet`: 헤더 덩어리(첫 칸)를 떼고 서비스 코드(`svc`)와 본문의 칸(`parts`)으로 나눈다.
+2. `to_chat`: `CONVERTERS`에 있는 코드만 다시보기 채팅과 같은 `type`과 `data`로 바꾼다. 나머지 코드는 버린다(로그도 남기지 않는다).
+
+어느 코드의 몇 번 칸을 어느 키로 옮기는지는 `docs/live_chat_packets.md` 8절을 본다.
+
+개발할 때는 `python -m app.core.soop_clients.live_clients.chat_client <bid>`로 한 방송의 모든 서비스 코드를 터미널에 찍어 볼 수 있다. 변환하는 코드는 변환 결과를, 나머지는 칸 그대로 찍는다(`--raw`면 전부 칸 그대로).
 
 ### 연결 유지
 
 - 14시간 동안 연결이 한 번도 끊기지 않았다(세 방송). 이후 여섯 방송, 약 15시간에서도 끊김은 없었다.
-- 패킷 사이 간격은 처음 테스트에서 가장 길 때 66초, 이후 204초였다. 0005 말고도 다른 코드가 꾸준히 와서 이 정도로 짧다. 지금은 300초(`RECV_TIMEOUT`)로 끊는다.
-- 300초(`RECV_TIMEOUT`) 동안 아무것도 안 오면 죽은 연결로 보고 끊는다. 핑에 응답이 없으니 이게 죽은 연결을 알아챌 유일한 방법이다.
+- 패킷 사이 간격은 처음 테스트에서 가장 길 때 66초, 이후 204초였다. 0005 말고도 다른 코드가 꾸준히 와서 이 정도로 짧다. 지금은 600초(`RECV_TIMEOUT`)로 끊는다.
+- 600초(`RECV_TIMEOUT`) 동안 아무것도 안 오면 죽은 연결로 보고 끊는다. 핑에 응답이 없으니 이게 죽은 연결을 알아챌 유일한 방법이다.
 - 연령 제한(-6)이 켜져도 이미 연결된 채팅은 계속 들어왔다(약 2시간, 2시간 반 구간 확인).
 - 연령 제한 중에 연결이 끊겨도, 마지막으로 받은 접속 정보로 다시 접속할 수 있었다.
 
@@ -284,7 +284,7 @@ docs/live_chat_packets.md 참고.
 | `bno` | 접속 정보 `BNO` | on_start |
 | `nick` | 접속 정보 `BJNICK` | on_start |
 | `title` | 접속 정보 `TITLE` → 이후 방송 현황 `broad_title` | on_start, detail_loop |
-| `hls_sd`, `hls_hd` | 재생 주소 (4절) | on_start, 같은 방송의 재접속(refresh_video). 발급에 실패하면 필드가 없다 |
+| `hls_sd`, `hls_hd` | 재생 주소 (4절) | on_start, 같은 방송의 재접속(refresh_video). 발급에 실패하면 필드가 없다. 지금 API에서는 쓰지 않는다(5절) |
 | `started_at` | 방송 현황 `station.broad_start` | detail_loop |
 | `viewers` | 방송 현황 `current_sum_viewer` | detail_loop |
 | `viewers_at` | 방송 현황 `current_timestamp` | detail_loop |
@@ -296,8 +296,9 @@ docs/live_chat_packets.md 참고.
 
 | 항목 | 내용 |
 |---|---|
-| 항목 | 올리는 패킷 한 건 = 항목 하나. 필드는 `svc`(서비스 코드 4자리)와 `parts`(JSON 문자열) |
-| 올리는 코드 | `app/broadcast/live/shared/chat_parser.RELAY_SVCS`: 0005 채팅, 0018 별풍선, 0087 애드벌룬, 0121 도전미션, 0091 신규 구독, 0093 N개월째 구독, 0108 구독권 선물, 0109 OGQ 이모티콘, 0125 도전미션 정산 명세, 0058 별별랭킹. 모두 같은 스트림, 같은 개수 제한 안에 들어간다 |
+| 항목 | 올리는 패킷 한 건 = 항목 하나. 필드는 `type`(다시보기 채팅과 같은 타입 이름)과 `data`(JSON 문자열). data의 키도 다시보기와 같다(`docs/review_chat_types.md`) |
+| 올리는 코드 | `app/broadcast/live/shared/chat_parser.CONVERTERS`: 0005 → `chat`, 0109 → `ogq`, 0018 → `balloon`, 0091(신규 구독), 0093(N개월째 구독) → `follow`. 모두 같은 스트림, 같은 개수 제한 안에 들어간다 |
+| 유저 아이디 | 스트림에는 `user_id`가 들어 있다. API(채팅 SSE)가 내보낼 때 `…user_id`로 끝나는 키를 뺀다 |
 | 길이 | 최근 약 `CHAT_MAXLEN`개만 남긴다(MAXLEN ~) |
 | ID | redis가 붙이는 `밀리초-순번`. 읽는 쪽이 "이 ID 다음부터"로 이어 읽는다 |
 
@@ -312,7 +313,7 @@ docs/live_chat_packets.md 참고.
 | collector 정상 종료 | 지운다 (watch_all) | 그대로 |
 | collector 강제 종료 | 남는다 | 남는다 |
 | collector 재시작, 방송 없음 | 첫 확인에서 지운다 | 600초 뒤 삭제 예약(첫 확인의 on_end) |
-| 방송 중에 `streamers.py`에서 뺌 | (정상 종료 때 지워짐) | 만료 없이 남는다. 직접 지운다 |
+| 방송 중에 `streamers` 테이블에서 빼고 collector를 다시 띄움 | (정상 종료 때 지워짐) | 만료 없이 남는다. 직접 지운다 |
 
 redis는 XADD나 HSET으로 값을 바꿔도 만료 시간을 초기화하지 않는다. 그래서 재시작할 때 PERSIST로 직접 취소한다.
 
@@ -412,5 +413,5 @@ watch_all (TaskGroup)
 | 비밀번호 방송의 RESULT와 BPWD | 만나면 확인 |
 | 방송 상태 변경(0007)의 본문 `1`, `0`의 뜻. 스트리머 본인의 채팅 접속과 관련 있을 수 있다(7절) | 웹 플레이어 개발자 도구로 0007 직후의 요청과 화면 변화 확인 / 짝이 오는 방송에서 0004가 같이 오는지 확인 / 다른 방송의 0007 본문 수집 |
 | 방송 종료 뒤에도 패킷이 계속 오는 방송이 있는지. 마지막 0007이 짝이면 RECV_TIMEOUT으로 종료를 아는데, 패킷이 계속 오면 그것도 걸리지 않는다 | live_check로 `viewers_at`이 멈춘 채 남아 있는 summary가 있는지 확인 |
-| 짝으로 오는 방송에서 송출 재시작으로 재생 주소가 바뀌었을 때 갱신할 계기. 연결을 유지해서 refresh_video가 일어나지 않는다 | API 설계 때 정한다 |
-| refresh_video가 일시적인 400으로 두 화질 모두 실패하면 다음 재접속까지 재생 주소가 없다 | API 설계 때 재시도 여부를 정한다 |
+| 짝으로 오는 방송에서 송출 재시작으로 재생 주소가 바뀌었을 때 갱신할 계기. 연결을 유지해서 refresh_video가 일어나지 않는다 | API가 공식 퍼가기를 써서 지금은 상관없다. 재생 주소를 직접 쓰게 되면 정한다 |
+| refresh_video가 일시적인 400으로 두 화질 모두 실패하면 다음 재접속까지 재생 주소가 없다 | 위와 같다. 재생 주소를 직접 쓰게 되면 재시도 여부를 정한다 |

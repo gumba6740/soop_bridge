@@ -4,6 +4,8 @@
 요소 이름은 `type` 컬럼에, 시간 태그 `t`는 `time_offset` 컬럼에 들어가고, 나머지는 타입별 규칙으로 골라 `data`(jsonb)에 담는다.
 
 - 변환 코드: `app/broadcast/review/shared/chat_parser.py`. 기존 데이터를 옮긴 마이그레이션(alembic `261012_0030`)과 규칙이 같다. 한쪽을 바꾸면 다른 쪽과 결과가 달라진다.
+- 값을 만드는 규칙(배지, 구독, 아이디 접미사, 숫자 변환)은 `app/broadcast/chat_rules.py`에 있다. 라이브 채팅 변환도 같은 파일을 쓴다.
+- 라이브 채팅도 `chat`, `ogq`, `balloon`, `follow`는 이 문서와 같은 `type`, 같은 data 키로 올린다. 라이브 패킷의 몇 번 칸이 어느 키가 되는지는 `live_chat_packets.md` 8절.
 - 각 타입의 **원본 태그** 줄은 XML 자식의 실제 순서다(`t` 제외). 마이그레이션 전의 `parts` 배열이 이 순서였다(`parts[1]`이 첫 태그).
 - `?`는 의미를 아직 확인하지 못한 값이다.
 - 채팅 XML 버전 `1.0.0` 기준. 원본 XML 표본은 `.local/scripts/xml_samples.py`로 받는다.
@@ -39,7 +41,12 @@
 
 ### API로 나가는 것
 
-`{type, t, data}`. data에서 `…user_id`로 끝나는 키는 뺀다. 닉네임은 내보낸다.
+| API | 한 건의 모양 |
+|---|---|
+| 다시보기 `GET /review/{vod_id}/chats?start=` | `{type, t, data}`. `t`는 VOD 전체 기준 초 |
+| 라이브 `GET /live/{bid}/chats` (SSE) | `{type, data}` |
+
+두 쪽 모두 data에서 `…user_id`로 끝나는 키(`user_id`, `from_user_id`, `to_user_id`)는 뺀다(`chat_rules.public`). 닉네임은 내보낸다.
 
 ### 저장하지 않는 칸
 
@@ -78,7 +85,7 @@
 | 키 | 출처 | 값 |
 |---|---|---|
 | `tier` | p2 19번 → `plus`, 18번 → `basic`, 둘 다 없음 → `none` | `none` / `basic` / `plus` |
-| `months` | `fw` (follow는 `period`) | 구독 개월. `tier`가 `none`이거나 값이 없으면 0 |
+| `months` | `fw` (follow는 `period`) | 구독 개월. `tier`가 `none`이거나 값이 없으면 0. 화면에 보이는 개월과 다를 수 있다(10절) |
 
 - 플래그1 28번(구독 여부)은 쓰지 않는다. 등급은 p2만 본다.
 - `p2`, `fw`가 없는 옛 형식(9절)은 `{"tier": "none", "months": 0}`이 된다.
@@ -489,3 +496,4 @@
 - **매니저와 열혈의 우선순위.** 둘 다 가진 사람의 화면 배지 확인.
 - **구독권 상품 코드 1, 21.** 한 건씩만 봤다. 11, 20과의 차이 확인.
 - **battle_mission 무승부.** `draw`가 1인 사례 확인.
+- **구독 개월 `fw`와 화면.** `months`는 `fw`를 쓰는데, 화면에 보이는 구독 개월은 `acfw` 자리의 값과 같았다(라이브 0005의 10번 칸으로 확인, `live_chat_packets.md` 2절). 두 값은 대부분 같지만 다른 사람은 화면과 다르게 나온다. 화면과 맞추려면 `acfw`로 바꾸고 다시보기 데이터를 다시 변환해야 한다.

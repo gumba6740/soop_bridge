@@ -33,7 +33,6 @@ temp/
 /benchmarks/chat/discard/
 /benchmarks/scripts/
 /sqls/*
-!/sqls/schemas.sql
 
 /app/broadcast/review/zzresult/
 /app/broadcast/review/discard/
