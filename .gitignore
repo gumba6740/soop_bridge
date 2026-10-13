@@ -34,9 +34,6 @@ temp/
 /benchmarks/scripts/
 /sqls/*
 
-/app/broadcast/review/zzresult/
-/app/broadcast/review/discard/
-
 
 #
 /tests/

@@ -1,16 +1,16 @@
 """SOOP 라이브 클라이언트 공통.
 
-chat_client와 vod_client, broad_client가 같이 쓰는 것들: 
+chat_client와 vod_client, broad_client가 같이 쓰는 것들:
     httpx 클라이언트, 접속 정보(CHANNEL) 조회.
 
 - 영구 실패(방송 중 아님, 로그인 필요, 비밀번호 방송 등) -> (status, None) 반환.
 - 일시 실패(429/5xx/타임아웃 등) -> 예외 전파.
 """
 
-from enum import StrEnum
 import logging
-from typing import Any
 from collections import Counter
+from enum import StrEnum
+from typing import Any
 
 import httpx
 
@@ -29,17 +29,19 @@ LIVE_API_COMMON = {
 
 # player_live_api 응답의 CHANNEL.RESULT 값과 대조 용도.
 RESULT_OK = 1
-RESULT_OFFLINE = 0          # 방송 중 아님
+RESULT_OFFLINE = 0  # 방송 중 아님
 RESULT_LOGIN_REQUIRED = -6  # 연령 제한 방송 등
-RESULT_SUB_PLUS = -14       # 구독플러스 방송
+RESULT_SUB_PLUS = -14  # 구독플러스 방송
+
 
 class LiveStatus(StrEnum):
     LIVE = "live"
-    OFFLINE = "offline"                 # RESULT 0
-    LOGIN_REQUIRED = "login_required"   # RESULT -6. 연령 제한 등
-    PASSWORD = "password"               # BPWD == "Y" (추정)
-    SUB_PLUS = "sub_plus"               # RESULT -14.
-    UNKNOWN = "unknown"                 # 그 밖의 RESULT
+    OFFLINE = "offline"  # RESULT 0
+    LOGIN_REQUIRED = "login_required"  # RESULT -6. 연령 제한 등
+    PASSWORD = "password"  # BPWD == "Y" (추정)
+    SUB_PLUS = "sub_plus"  # RESULT -14.
+    UNKNOWN = "unknown"  # 그 밖의 RESULT
+
 
 DEFAULT_HEADERS = {
     "User-Agent": (
@@ -69,6 +71,7 @@ def get_client() -> httpx.AsyncClient:
 
 # SOOP에 보낸 요청 수. 주소의 마지막 부분별로 센다. 읽고 비우는 건 collector가 한다.
 request_counts: Counter[str] = Counter()
+
 
 async def _count_request(request: httpx.Request) -> None:
     request_counts[request.url.path.rsplit("/", 1)[-1]] += 1

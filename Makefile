@@ -1,4 +1,4 @@
-.PHONY: lint format check fixall test
+.PHONY: lint format mypy fixall test
 
 lint:
 	uv run ruff check --fix app/
@@ -6,10 +6,10 @@ lint:
 format:
 	uv run ruff format app/
 
-check:
+mypy:
 	uv run mypy app/
 
-fixall: lint format check
+fixall: lint format mypy
 
 test:
 	uv run pytest --cov=app --cov-report=term-missing tests/

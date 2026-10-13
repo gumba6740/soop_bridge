@@ -32,27 +32,32 @@ from datetime import datetime
 from typing import Any
 
 from redis.asyncio import Redis
+from redis.typing import EncodableT, FieldT
 
+from app.broadcast.live.shared.chat_parser import parse_packet, to_chat
 from app.core.config import settings
 from app.core.soop_clients.live_clients.broad_client import get_broad_detail
 from app.core.soop_clients.live_clients.chat_client import stream_live_chats
-from app.core.soop_clients.live_clients.shared import LiveStatus, get_live_info
+from app.core.soop_clients.live_clients.shared import (
+    LiveStatus,
+    get_live_info,
+    request_counts,
+)
 from app.core.soop_clients.live_clients.vod_client import get_hls_url
-from app.broadcast.live.shared.chat_parser import parse_packet, to_chat
-from app.core.soop_clients.live_clients.shared import request_counts
 from app.utils.tz import KST
 
 logger = logging.getLogger(__name__)
 
 
-POLL_INTERVAL = 60               # 방송 중이 아닐 때 다시 확인하는 간격(초)
-RETRY_DELAY = 20                 # 에러(연결 끊김 등) 뒤 다시 시도하기까지(초)
-DETAIL_INTERVAL = 60             # 방송 중일 때 시청자 수 등을 갱신하는 간격(초)
-CHAT_MAXLEN = 200                # 스트림에 남길 최근 채팅 수 (대략)
-CHAT_TTL_AFTER_END = 600         # 방송이 끝난 뒤 채팅 스트림을 남겨둘 시간(초)
-VIDEO_QUALITIES = ("sd", "hd")   # 360p, 540p. 웹 경로로는 540p가 최대
-START_STAGGER = 0.5              # watch를 띄우는 간격(초). 요청이 한순간에 몰리지 않게
-STATS_INTERVAL = 60
+POLL_INTERVAL = 60  # 방송 중이 아닐 때 다시 확인하는 간격(초)
+RETRY_DELAY = 20  # 에러(연결 끊김 등) 뒤 다시 시도하기까지(초)
+DETAIL_INTERVAL = 60  # 방송 중일 때 시청자 수 등을 갱신하는 간격(초)
+CHAT_MAXLEN = 200  # 스트림에 남길 최근 채팅 수 (대략)
+CHAT_TTL_AFTER_END = 600  # 방송이 끝난 뒤 채팅 스트림을 남겨둘 시간(초)
+VIDEO_QUALITIES = ("sd", "hd")  # 360p, 540p. 웹 경로로는 540p가 최대
+START_STAGGER = 0.5  # watch를 띄우는 간격(초). 요청이 한순간에 몰리지 않게
+STATS_INTERVAL = 60  # live-collector에서 soop으로 나가는 요청 수를 셀 간격 (초)
+
 
 def _kst_iso(text: str) -> str:
     """SOOP의 시각 문자열("2026-10-04 18:01:57", 한국시간)을 KST가 붙은 ISO 형식으로."""
@@ -87,7 +92,7 @@ async def _hls_mapping(bid: str, info: dict[str, Any]) -> dict[str, str]:
 
 async def on_start(r: Redis, bid: str, info: dict[str, Any]) -> None:
     """방송이 시작됐거나 BNO가 바뀌었을 때. summary를 새로 쓴다."""
-    mapping = {
+    mapping: dict[FieldT, EncodableT] = {
         "bno": str(info.get("BNO", "")),
         "nick": str(info.get("BJNICK", "")),
         "title": str(info.get("TITLE", "")),
@@ -112,7 +117,8 @@ async def refresh_video(r: Redis, bid: str, info: dict[str, Any]) -> None:
 
     0007 뒤에 송출이 다시 시작되면, BNO와 aid가 같아도 이전 주소가 400이 되는 경우가 있었다.
     """
-    mapping = await _hls_mapping(bid, info)
+    mapping: dict[FieldT, EncodableT] = {}
+    mapping.update(await _hls_mapping(bid, info))
     mapping.update(_tag_mapping(info))
     hls_fields = [f"hls_{quality}" for quality in VIDEO_QUALITIES]
     # 받지 못한 화질의 이전 주소가 남지 않도록 지우고 새로 쓴다.
@@ -141,7 +147,7 @@ async def detail_loop(r: Redis, bid: str, bno: str) -> None:
             # 접속 정보와 엇갈려서 다른 방송의 값이 오면 쓰지 않는다.
             if data is not None and str(data["broad"].get("broad_no")) == bno:
                 broad, station = data["broad"], data.get("station") or {}
-                mapping = {
+                mapping: dict[FieldT, EncodableT] = {
                     "title": str(broad.get("broad_title", "")),
                     "viewers": str(broad.get("current_sum_viewer", "")),
                     "viewers_at": _kst_iso(data["current_timestamp"]),
@@ -206,7 +212,11 @@ async def watch(r: Redis, bid: str) -> None:
 
                 # 방송 중에 연령 제한이 켜진 것. 방송은 계속되니 summary는 두고,
                 # 마지막으로 받은 접속 정보로 다시 접속한다(이전 정보로도 들어갈 수 있다).
-                if status == LiveStatus.LOGIN_REQUIRED and live and last_info is not None:
+                if (
+                    status == LiveStatus.LOGIN_REQUIRED
+                    and live
+                    and last_info is not None
+                ):
                     logger.info("bid=%s 연령 제한 중. 이전 접속 정보로 재접속", bid)
                     info = last_info
                 # info가 None이면 방송 종료 상태.

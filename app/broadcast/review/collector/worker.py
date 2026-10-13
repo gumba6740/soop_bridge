@@ -1,7 +1,7 @@
 """온디맨드 채팅 수집 워커.
 
 API가 redis 큐에 vod_id를 넣으면, 여기서 하나씩 꺼내 채팅을 수집한다.
-크론은 최신 영상의 채팅만 수집하므로(CHAT_COLLECT_SINCE 이후), 
+크론은 최신 영상의 채팅만 수집하므로(CHAT_COLLECT_SINCE 이후),
 유저가 채팅이 없는 영상의 다시보기 요청 시 즉각 수집하여 올려준다.
 동시 요청이 오더라도 soop 서버에 가는 부하를 고려해 순차 처리하도록 한다.
 
@@ -19,8 +19,8 @@ from typing import cast
 import redis.asyncio as redis
 from psycopg import AsyncConnection
 
-from app.core.config import settings
 from app.broadcast.review.collector.chats import collect_vod_chats
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -43,9 +43,7 @@ async def _handle(raw: str) -> None:
 
 
 async def run_worker() -> None:
-    r = redis.from_url(
-        settings.redis_url, decode_responses=True, socket_timeout=30
-    )
+    r = redis.from_url(settings.redis_url, decode_responses=True, socket_timeout=30)
     queue = settings.chat_job_queue_key
     pending = settings.chat_job_pending_key
     logger.info("워커 시작. 큐=%s", queue)
@@ -60,7 +58,7 @@ async def run_worker() -> None:
             _, raw_id = cast(tuple[str, str], item)
 
             try:
-                await _handle(raw_id)  # 
+                await _handle(raw_id)  #
             except asyncio.CancelledError:
                 # 종료 신호로 중단됨. pending은 그대로 두고 큐 맨 앞에 돌려놓는다.
                 logger.warning("종료 신호로 중단. 큐에 되돌려 놓음: %s", raw_id)

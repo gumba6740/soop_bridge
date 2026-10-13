@@ -67,7 +67,9 @@ async def get_view_url(rmd: str, cdn: str, bno: str, quality: str) -> str | None
     if not view_url:
         logger.info(
             "[PERM] bno=%s quality=%s view_url 없음 (stream_status=%s)",
-            bno, quality, data.get("stream_status"),
+            bno,
+            quality,
+            data.get("stream_status"),
         )
         return None
     return view_url

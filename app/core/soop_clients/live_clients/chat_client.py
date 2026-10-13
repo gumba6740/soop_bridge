@@ -23,8 +23,8 @@ from typing import Any
 
 import websockets
 from websockets.asyncio.client import ClientConnection
-from app.core.soop_clients.live_clients.shared import request_counts
 
+from app.core.soop_clients.live_clients.shared import request_counts
 
 logger = logging.getLogger(__name__)
 
@@ -147,7 +147,11 @@ async def stream_live_chats(bid: str, info: dict[str, Any]) -> AsyncGenerator[by
                     if pair_deadline is None:
                         raise
                     # 짝 없이 마감이 지났다. 예전처럼 끝내고 판단은 호출부에 맡긴다.
-                    logger.info("bid=%s %s님의 방송 상태 변경. 짝 없음, 연결 종료", bid, strmr_nick)
+                    logger.info(
+                        "bid=%s %s님의 방송 상태 변경. 짝 없음, 연결 종료",
+                        bid,
+                        strmr_nick,
+                    )
                     return
                 if not isinstance(raw, bytes):
                     continue
@@ -158,13 +162,19 @@ async def stream_live_chats(bid: str, info: dict[str, Any]) -> AsyncGenerator[by
                     yield raw
 
                 else:
-                    logger.debug("bid=%s %s님의 방송 상태 변경 raw=%r", bid, strmr_nick, raw)
+                    logger.debug(
+                        "bid=%s %s님의 방송 상태 변경 raw=%r", bid, strmr_nick, raw
+                    )
                     # 0007을 처음 만난 경우
                     if pair_deadline is None:
                         pair_deadline = loop.time() + STATE_PAIR_WINDOW
                     else:
                         # 0007을 1초 내에 두번째로 만난 경우.
-                        logger.debug("bid=%s %s님의 방송 상태 변경. 짝, 연결 유지", bid, strmr_nick)
+                        logger.debug(
+                            "bid=%s %s님의 방송 상태 변경. 짝, 연결 유지",
+                            bid,
+                            strmr_nick,
+                        )
                         pair_deadline = None
 
         finally:
@@ -177,14 +187,13 @@ async def stream_live_chats(bid: str, info: dict[str, Any]) -> AsyncGenerator[by
 if __name__ == "__main__":
     import argparse
 
-    from app.core.log import setup_logging
-    from app.core.soop_clients.live_clients.shared import aclose, get_live_info
-
     # 개발용 실행이라 여기서만 app.broadcast.live를 쓴다. 모듈 본체는 core 밖을 import하지 않는다.
     import json
 
     # 개발용 실행이라 여기서만 app.broadcast.live를 쓴다. 모듈 본체는 core 밖을 import하지 않는다.
     from app.broadcast.live.shared.chat_parser import parse_packet, to_chat
+    from app.core.log import setup_logging
+    from app.core.soop_clients.live_clients.shared import aclose, get_live_info
 
     async def _main(bid: str, raw: bool) -> None:
         """모든 서비스 코드를 찍는다.
@@ -207,7 +216,9 @@ if __name__ == "__main__":
                 if chat is None:
                     print(f"{parsed.svc} {parsed.parts}")
                 else:
-                    print(f"{parsed.svc} {chat.type} {json.dumps(chat.data, ensure_ascii=False)}")
+                    print(
+                        f"{parsed.svc} {chat.type} {json.dumps(chat.data, ensure_ascii=False)}"
+                    )
         finally:
             await aclose()
 

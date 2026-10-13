@@ -1,22 +1,22 @@
 import logging
 
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models import Streamer, Vod
-from app.broadcast.review.api.schemas.vod_schemas import (
-    VodListItem, VodFileOut, VodDetailOut
-)
 from app.broadcast.review.api.exceptions import VodNotFound
-
-from sqlalchemy.ext.asyncio import AsyncSession
-
-
+from app.broadcast.review.api.schemas.vod_schemas import (
+    VodDetailOut,
+    VodFileOut,
+    VodListItem,
+)
+from app.models import Streamer, Vod
 
 logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------- VOD
+
 
 async def get_vod(db: AsyncSession, vod_id: int) -> VodDetailOut:
     # files는 lazy="raise"라서 selectinload로 명시해서 같이 가져온다.
@@ -44,7 +44,7 @@ async def get_vod(db: AsyncSession, vod_id: int) -> VodDetailOut:
     return VodDetailOut(
         **VodListItem.model_validate(vod).model_dump(),
         bid=vod.bid,
-        # streamers 테이블에 없는 스트리머의 vod에 대비. 수동으로 돌린 경우 
+        # streamers 테이블에 없는 스트리머의 vod에 대비. 수동으로 돌린 경우
         # 이 케이스가 생길 수 있음.
         nick=streamer.nick if streamer is not None else vod.bid,
         files=files,

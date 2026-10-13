@@ -1,14 +1,14 @@
 """collector 엔트리포인트.
 
-    python -m app.broadcast.review.collector vods                    # streamers 테이블 전체 증분 수집
-    python -m app.broadcast.review.collector vods --bid beadyo97     # 특정 스트리머만
-    python -m app.broadcast.review.collector vods --retry            # 일시 실패분 재시도
-    python -m app.broadcast.eview.collector vods --sweep --bid X  # 목록과 DB 대조해 누락분 수집
+    python -m app.broadcast.review.collector vods
+    python -m app.broadcast.review.collector vods --bid beadyo97
+    python -m app.broadcast.review.collector vods --retry
+    python -m app.broadcast.eview.collector vods --sweep --bid X
 
-    python -m app.broadcast.review.collector chats --count 3         # 크론: 미완료 VOD 최대 3건
-    python -m app.broadcast.review.collector chats --vod-id 12345    # 수동: 지정 VOD
+    python -m app.broadcast.review.collector chats --count <int>
+    python -m app.broadcast.review.collector chats --vod-id <vod_id>
 
-    python -m app.broadcast.review.collector worker                  # 온디맨드 채팅 수집 워커(상시 실행)
+    python -m app.broadcast.review.collector worker
 
 chats는 --count와 --vod-id 중 하나를 반드시 붙여야 한다.
 
@@ -21,14 +21,12 @@ chats --vod-id는 전역 락 없이 돌고, 동시성은 collect_part의 파트 
 
 import argparse
 import asyncio
+import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-import logging
 
 from psycopg import AsyncConnection
 
-from app.core.config import settings
-from app.core.log import setup_logging
 from app.broadcast.review.collector.chats import collect_vod_chats, next_chat_targets
 from app.broadcast.review.collector.vods import (
     collect_new_vods,
@@ -36,6 +34,8 @@ from app.broadcast.review.collector.vods import (
     sweep_missing_vods,
 )
 from app.broadcast.review.collector.worker import run_worker
+from app.core.config import settings
+from app.core.log import setup_logging
 from app.core.soop_clients.review_client import aclose
 
 logger = logging.getLogger(__name__)
@@ -46,10 +46,9 @@ CHATS_LOCK_KEY = 0x50D_B001
 
 # ---------------------------------------------------------------- 공통
 
+
 @asynccontextmanager
-async def global_lock(
-    conn: AsyncConnection, key: int
-) -> AsyncGenerator[bool, None]:
+async def global_lock(conn: AsyncConnection, key: int) -> AsyncGenerator[bool]:
     """세션 레벨 advisory lock. 잡았으면 True를 넘기고, 끝나면 푼다.
 
     프로세스가 강제 종료돼도 커넥션이 끊기면 자동으로 풀린다.
@@ -75,6 +74,7 @@ async def _targets(conn: AsyncConnection, bid: str | None) -> list[tuple[str, st
 
 
 # ---------------------------------------------------------------- vods
+
 
 async def run_vods(
     conn: AsyncConnection, *, bid: str | None, retry: bool, sweep: bool
@@ -106,6 +106,7 @@ async def run_vods(
 
 # ---------------------------------------------------------------- chats
 
+
 async def run_chats(
     conn: AsyncConnection, *, count: int | None, vod_id: int | None
 ) -> None:
@@ -132,7 +133,6 @@ async def run_chats(
             await collect_vod_chats(conn, target)
 
 
-
 # ---------------------------------------------------------------- 엔트리
 
 
@@ -147,12 +147,14 @@ def _build_parser() -> argparse.ArgumentParser:
     mode.add_argument(
         "--sweep",
         action="store_true",
-        help="목록과 DB를 대조해 누락분 수집 (--bid 필수)"
+        help="목록과 DB를 대조해 누락분 수집 (--bid 필수)",
     )
 
     p = sub.add_parser("chats", help="채팅 수집")
     target = p.add_mutually_exclusive_group(required=True)
-    target.add_argument("--count", type=int, help="미완료 VOD를 최대 이만큼 수집 (크론)")
+    target.add_argument(
+        "--count", type=int, help="미완료 VOD를 최대 이만큼 수집 (크론)"
+    )
     target.add_argument("--vod-id", type=int, help="이 VOD만 수집 (기준일/쿨다운 무시)")
 
     sub.add_parser("worker", help="온디맨드 채팅 수집 워커 (redis 큐 대기)")
@@ -167,7 +169,9 @@ async def main() -> None:
     args = parser.parse_args()
 
     if args.command == "vods" and args.retry and args.bid:
-        parser.error("--retry는 실패 테이블 전체를 대상으로 하므로 --bid와 같이 쓸 수 없다")
+        parser.error(
+            "--retry는 실패 테이블 전체를 대상으로 하므로 --bid와 같이 쓸 수 없다"
+        )
     if args.command == "vods" and args.sweep and not args.bid:
         parser.error("--sweep은 --bid와 같이 써야 한다")
     if args.command == "chats" and args.count is not None and args.count < 1:

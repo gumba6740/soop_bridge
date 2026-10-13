@@ -14,17 +14,15 @@ media_exception.code 는 중첩이라 alias로 못 잡으므로
 model_validator에서 media_code 로 평탄화한다.
 """
 
-from datetime import datetime
 import logging
+from datetime import datetime
 from typing import Any
 
-
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
 from app.utils.tz import KST
 
 logger = logging.getLogger(__name__)
-
-
 
 
 def _to_kst(v: datetime | None) -> datetime | None:
@@ -39,7 +37,7 @@ class _SoopModel(BaseModel):
 
     model_config = ConfigDict(
         populate_by_name=True,  # 필드명/alias 둘 다 허용
-        extra="ignore",         # 응답에 모르는 키가 늘어나도 깨지지 않음
+        extra="ignore",  # 응답에 모르는 키가 늘어나도 깨지지 않음
         str_strip_whitespace=True,
     )
 
@@ -52,13 +50,13 @@ class VodRow(_SoopModel):
     broad_start: datetime
     broad_end: datetime | None = Field(default=None, alias="write_tm")
 
-    grade: int = 0                              # 19 = 성인인증 필요
-    auth_no: int | None = None                  # 107 = 구독+ 전용 추정
-    permanence: bool | None = None              # "Y"/"N"
+    grade: int = 0  # 19 = 성인인증 필요
+    auth_no: int | None = None  # 107 = 구독+ 전용 추정
+    permanence: bool | None = None  # "Y"/"N"
     auto_delete_date: datetime | None = None
-    chat_duration: int = 300                    # 초. 채팅 조회 단위
-    media_code: int | None = None               # media_exception.code
-    broad_idx: int | None = None                # 방송 세션 번호
+    chat_duration: int = 300  # 초. 채팅 조회 단위
+    media_code: int | None = None  # media_exception.code
+    broad_idx: int | None = None  # 방송 세션 번호
     hashtags: list[str] = Field(default_factory=list)  # "a,b,c" -> ["a", "b", "c"]
 
     view_cnt: int | None = None

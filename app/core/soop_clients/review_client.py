@@ -79,16 +79,14 @@ def _body_failed(data: dict[str, Any]) -> str | None:
     return None
 
 
-async def get_vod_list(
-    bid: str, page: int = 1, per_page: int = 60
-) -> dict[str, Any]:
+async def get_vod_list(bid: str, page: int = 1, per_page: int = 60) -> dict[str, Any]:
     """스트리머의 VOD 목록을 가져온다 (reg_date 최신순).
 
     Raises:
         httpx.HTTPStatusError: 목록 조회 실패. 목록은 영구 실패 개념이 없으므로
             그대로 전파해서 해당 bid 동기화를 중단시킨다.
     """
-    params = {
+    params: dict[str, int | str] = {
         "page": page,
         "per_page": per_page,
         "orderby": "reg_date",
@@ -118,9 +116,7 @@ async def get_vod_detail(vod_id: int) -> dict[str, Any] | None:
         resp.raise_for_status()
     except httpx.HTTPStatusError as e:
         if e.response.status_code in PERMANENT_STATUSES:
-            logger.info(
-                "[PERM] vod_id=%d status=%d", vod_id, e.response.status_code
-            )
+            logger.info("[PERM] vod_id=%d status=%d", vod_id, e.response.status_code)
             return None
         raise  # 429 / 5xx -> 재시도 대상
 

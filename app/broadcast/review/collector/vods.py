@@ -22,15 +22,19 @@ from psycopg import AsyncConnection
 from pydantic import ValidationError
 
 from app.broadcast.review.shared.schemas import VodFileRow, VodRow
-from app.core.soop_clients.review_client import get_vod_detail, get_vod_list, polite_sleep
+from app.core.soop_clients.review_client import (
+    get_vod_detail,
+    get_vod_list,
+    polite_sleep,
+)
 
 logger = logging.getLogger(__name__)
 
-REQUEST_DELAY = 1.0      # 초. 모든 외부 요청 직전에 무조건 적용.
-PER_PAGE = 60            # 서버가 20 ~ 60까지 받는 것을 확인함.
-MAX_RETRY_ATTEMPTS = 5   # 이 횟수를 넘으면 permanent로 승격.
+REQUEST_DELAY = 1.0  # 초. 모든 외부 요청 직전에 무조건 적용.
+PER_PAGE = 60  # 서버가 20 ~ 60까지 받는 것을 확인함.
+MAX_RETRY_ATTEMPTS = 5  # 이 횟수를 넘으면 permanent로 승격.
 FILES_COVERAGE_WARN = 0.95  # 파트별 영상길이 합계가 total_duration(영상 총 길이)의
-                            # 비율이 이것 미만이면 누락으로 판단.
+# 비율이 이것 미만이면 누락으로 판단.
 
 
 # ---------------------------------------------------------------- SQL
@@ -111,6 +115,7 @@ RETRYABLE_SQL = """
 
 # ---------------------------------------------------------------- 조회
 
+
 async def _scalar(conn: AsyncConnection, sql: str, params: Any) -> int:
     cur = await conn.execute(sql, params)
     row = await cur.fetchone()
@@ -149,7 +154,9 @@ async def fetch_new_vod_ids(bid: str, watermark: int) -> tuple[list[int], int]:
     if actual_per_page != PER_PAGE:
         logger.info(
             "[%s] per_page 요청 %d → 실제 %d (서버 상한)",
-            bid, PER_PAGE, actual_per_page,
+            bid,
+            PER_PAGE,
+            actual_per_page,
         )
 
     logger.info("[%s] API 총 %d개 / %d페이지", bid, total, last_page)
@@ -218,9 +225,8 @@ def parse_vod_detail(
 
 # ---------------------------------------------------------------- 저장
 
-async def save_vod(
-    conn: AsyncConnection, vod: VodRow, files: list[VodFileRow]
-) -> bool:
+
+async def save_vod(conn: AsyncConnection, vod: VodRow, files: list[VodFileRow]) -> bool:
     """vods + vod_files를 한 트랜잭션으로 저장한다. 신규 삽입이면 True."""
     async with conn.transaction():
         cur = await conn.execute(VOD_SQL, vod.model_dump())
@@ -228,9 +234,7 @@ async def save_vod(
 
         if files:
             async with conn.cursor() as cur:
-                await cur.executemany(
-                    VOD_FILE_SQL, [f.model_dump() for f in files]
-                )
+                await cur.executemany(VOD_FILE_SQL, [f.model_dump() for f in files])
 
         await conn.execute(RESOLVE_FAILURE_SQL, (vod.vod_id,))
 
@@ -263,14 +267,19 @@ def _log_coverage(bid: str, vod: VodRow, files: list[VodFileRow]) -> None:
     if not files:
         logger.info(
             "[%s] vod_id=%d 파트 없음 (auth_no=%s, media_code=%s)",
-            bid, vod.vod_id, vod.auth_no, vod.media_code,
+            bid,
+            vod.vod_id,
+            vod.auth_no,
+            vod.media_code,
         )
         return
 
     if vod.total_duration <= 0:
         logger.info(
             "[%s] vod_id=%d total_duration=%d, 총 영상시간 잘못됨",
-            bid, vod.vod_id, vod.total_duration
+            bid,
+            vod.vod_id,
+            vod.total_duration,
         )
         return
 
@@ -280,7 +289,10 @@ def _log_coverage(bid: str, vod: VodRow, files: list[VodFileRow]) -> None:
     if ratio < FILES_COVERAGE_WARN:
         logger.info(
             "[%s] vod_id=%d 파트 일부 누락: %.0f%% (grade=%d, file_order=%s)",
-            bid, vod.vod_id, ratio * 100, vod.grade,
+            bid,
+            vod.vod_id,
+            ratio * 100,
+            vod.grade,
             [f.file_order for f in files],
         )
 
@@ -300,7 +312,9 @@ async def process_vod(conn: AsyncConnection, vod_id: int, bid: str) -> bool:
         return False
 
     if data is None:
-        await record_failure(conn, vod_id, bid, "영구 실패(삭제/비공개)", permanent=True)
+        await record_failure(
+            conn, vod_id, bid, "영구 실패(삭제/비공개)", permanent=True
+        )
         return False
 
     result = parse_vod_detail(vod_id, data)
@@ -316,7 +330,9 @@ async def process_vod(conn: AsyncConnection, vod_id: int, bid: str) -> bool:
     is_inserted = await save_vod(conn, vod, files)
     logger.info(
         "[OK] vod_id=%d %s (파트 %d개)",
-        vod_id, "저장" if is_inserted else "중복", len(files),
+        vod_id,
+        "저장" if is_inserted else "중복",
+        len(files),
     )
     return is_inserted
 
@@ -342,7 +358,10 @@ async def collect_new_vods(conn: AsyncConnection, bid: str) -> int:
         if accounted < total:
             logger.warning(
                 "[%s] 누락 의심: 처리완료 %d < API 총계 %d (%d건). --sweep 권장",
-                bid, accounted, total, total - accounted,
+                bid,
+                accounted,
+                total,
+                total - accounted,
             )
         elif accounted > total:
             # 스트리머가 VOD를 지우면 자연스럽게 발생한다. 정보성 로그.
@@ -365,7 +384,10 @@ async def sweep_missing_vods(conn: AsyncConnection, bid: str) -> int:
     missing = sorted(set(list_ids) - known)
     logger.info(
         "[%s] sweep: 목록 %d / DB %d / 누락 %d",
-        bid, len(list_ids), len(known), len(missing),
+        bid,
+        len(list_ids),
+        len(known),
+        len(missing),
     )
 
     saved = 0
@@ -376,6 +398,7 @@ async def sweep_missing_vods(conn: AsyncConnection, bid: str) -> int:
 
 
 # ---------------------------------------------------------------- 재시도
+
 
 async def retry_failures(conn: AsyncConnection) -> int:
     """일시 실패로 기록된 VOD를 재시도한다. 수집 루프와 분리된 별도 경로."""

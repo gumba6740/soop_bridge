@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     postgres_user: str
     postgres_password: str
     postgres_db: str
-    postgres_host: str = "localhost"   # 컨테이너에서는 compose가 "db"로 덮어쓴다
+    postgres_host: str = "localhost"  # 컨테이너에서는 compose가 "db"로 덮어쓴다
     postgres_port: int = 5432
 
     @property
@@ -17,6 +17,7 @@ class Settings(BaseSettings):
             f"postgresql://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )
+
     @property
     def sqlalchemy_url(self) -> str:
         return (

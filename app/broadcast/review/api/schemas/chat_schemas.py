@@ -16,12 +16,12 @@ class ChatItem(BaseModel):
     """
 
     type: str
-    t: float                # VOD 전체 기준 오프셋(초)
+    t: float  # VOD 전체 기준 오프셋(초)
     data: dict[str, Any]
 
 
 class ChatWindowOut(BaseModel):
     start: float
     end: float
-    complete: bool          # 이 구간의 수집이 끝났는가. False면 잠시 뒤 다시 요청
+    complete: bool  # 이 구간의 수집이 끝났는가. False면 잠시 뒤 다시 요청
     items: list[ChatItem]

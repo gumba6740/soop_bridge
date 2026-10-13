@@ -24,4 +24,4 @@ class LiveDetail(LiveItem):
     """라이브 화면의 방송 현황."""
 
     viewers_at: datetime | None  # viewers를 받은 시각
-    embed_url: str               # SOOP 공식 퍼가기 플레이어 주소
+    embed_url: str  # SOOP 공식 퍼가기 플레이어 주소

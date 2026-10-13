@@ -33,13 +33,15 @@ Data = dict[str, Any]
 
 
 class LivePacket(NamedTuple):
-    svc: str          # 서비스 코드 4자리. 예: "0005"
-    parts: list[str]  # 헤더를 뺀 본문의 칸. 0005면 parts[0]이 메시지, parts[1]이 유저 id
+    svc: str  # 서비스 코드 4자리. 예: "0005"
+    parts: list[
+        str
+    ]  # 헤더를 뺀 본문의 칸. 0005면 parts[0]이 메시지, parts[1]이 유저 id
 
 
 class LiveChat(NamedTuple):
-    type: str         # 다시보기와 같은 타입 이름. 예: "chat"
-    data: Data        # 다시보기와 같은 키
+    type: str  # 다시보기와 같은 타입 이름. 예: "chat"
+    data: Data  # 다시보기와 같은 키
 
 
 def parse_packet(raw: bytes) -> LivePacket | None:
@@ -57,13 +59,14 @@ def parse_packet(raw: bytes) -> LivePacket | None:
 
 # ------------------------------------------------------ 코드별 변환
 
+
 def _at(parts: list[str], i: int) -> str | None:
     """칸이 모자라면 None (다시보기에서 태그가 없을 때와 같다)."""
     return parts[i] if i < len(parts) else None
 
 
 def _flags(parts: list[str], i: int) -> tuple[int | None, int | None]:
-    """"플래그1|플래그2" 칸을 두 숫자로."""
+    """ "플래그1|플래그2" 칸을 두 숫자로."""
     p, _, p2 = (_at(parts, i) or "").partition("|")
     return num(p), num(p2)
 
@@ -72,43 +75,60 @@ def _chat(parts: list[str]) -> Data:
     # 0005: [메시지, 아이디, 0, 0, 언어, 닉네임, 플래그1|플래그2, 개월(fw),
     #        색상, 색상, 개월(acfw), ...]
     p, p2 = _flags(parts, 6)
-    return {"message": _at(parts, 0), "user_id": uid(_at(parts, 1)),
-            "user_nick": _at(parts, 5),
-            "badge": badge(p),
-            "subscriber": sub(tier(p2), num(_at(parts, 7)))}
+    return {
+        "message": _at(parts, 0),
+        "user_id": uid(_at(parts, 1)),
+        "user_nick": _at(parts, 5),
+        "badge": badge(p),
+        "subscriber": sub(tier(p2), num(_at(parts, 7))),
+    }
 
 
 def _ogq(parts: list[str]) -> Data:
     # 0109: 다시보기 ogq와 칸 순서가 같다
     # [ch, m, gid, sid, v, s, sn, sf, c, l, mt, e, fw, nf, nd, acfw, ...]
     p, p2 = _flags(parts, 7)
-    return {"message": _at(parts, 1), "user_id": uid(_at(parts, 5)),
-            "user_nick": _at(parts, 6),
-            "badge": badge(p),
-            "subscriber": sub(tier(p2), num(_at(parts, 12))),
-            "group_id": _at(parts, 2), "sticker_id": num(_at(parts, 3))}
+    return {
+        "message": _at(parts, 1),
+        "user_id": uid(_at(parts, 5)),
+        "user_nick": _at(parts, 6),
+        "badge": badge(p),
+        "subscriber": sub(tier(p2), num(_at(parts, 12))),
+        "group_id": _at(parts, 2),
+        "sticker_id": num(_at(parts, 3)),
+    }
 
 
 def _balloon(parts: list[str]) -> Data:
     # 0018: [bid, 후원자 id, 닉네임, 개수, 0, 0, CHATNO, 연출 파일 이름, ...]
-    return {"bid": _at(parts, 0), "user_id": uid(_at(parts, 1)),
-            "user_nick": _at(parts, 2), "count": num(_at(parts, 3))}
+    return {
+        "bid": _at(parts, 0),
+        "user_id": uid(_at(parts, 1)),
+        "user_nick": _at(parts, 2),
+        "count": num(_at(parts, 3)),
+    }
 
 
 def _follow_new(parts: list[str]) -> Data:
     # 0091 신규 구독: [CHATNO, bid, id, 닉네임, 코드, 1, 누적 개월, 등급, uuid, 언어, 시각]
     # 첫 달이라 연속 개월 칸이 없다. 항상 1개월로 본다
-    return {"bid": _at(parts, 1), "user_id": uid(_at(parts, 2)),
-            "user_nick": _at(parts, 3),
-            "subscriber": sub(stier(_at(parts, 7)), 1)}
+    return {
+        "bid": _at(parts, 1),
+        "user_id": uid(_at(parts, 2)),
+        "user_nick": _at(parts, 3),
+        "subscriber": sub(stier(_at(parts, 7)), 1),
+    }
 
 
 def _follow_months(parts: list[str]) -> Data:
     # 0093 N개월째 구독:
     # [bid, id, 닉네임, 연속 개월, CHATNO, 코드, 누적 개월, 등급, uuid, 언어, 시각]
-    return {"bid": _at(parts, 0), "user_id": uid(_at(parts, 1)),
-            "user_nick": _at(parts, 2),
-            "subscriber": sub(stier(_at(parts, 7)), num(_at(parts, 3)))}
+    return {
+        "bid": _at(parts, 0),
+        "user_id": uid(_at(parts, 1)),
+        "user_nick": _at(parts, 2),
+        "subscriber": sub(stier(_at(parts, 7)), num(_at(parts, 3))),
+    }
 
 
 # 서비스 코드 → (다시보기 type, 변환 함수). 여기 없는 코드는 버린다.

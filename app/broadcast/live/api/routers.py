@@ -3,10 +3,9 @@
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
-from app.core.deps import DBDep, DBFuncDep, RDep, HubDep
-from app.broadcast.live.api.schemas import LiveDetail
 from app.broadcast.live.api import services
-
+from app.broadcast.live.api.schemas import LiveDetail
+from app.core.deps import DBDep, DBFuncDep, HubDep, RDep
 
 router = APIRouter(prefix="/live", tags=["live"])
 

@@ -1,21 +1,21 @@
 import logging
-from typing import Any, NamedTuple
+from typing import NamedTuple
 
 from redis.asyncio import Redis
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
-from app.models import Chat, ChatProgress, Vod, VodFile
+from app.broadcast.chat_rules import public
 from app.broadcast.review.api.exceptions import VodNotFound
 from app.broadcast.review.api.schemas.chat_schemas import ChatItem, ChatWindowOut
-from app.broadcast.chat_rules import public
-
+from app.core.config import settings
+from app.models import Chat, ChatProgress, Vod, VodFile
 
 logger = logging.getLogger(__name__)
 
 
 CHAT_WINDOW = 300.0  # 초. 채팅을 한 번에 300초 분량씩 넘겨준다.
+
 
 async def get_chats(
     db: AsyncSession, r: Redis, vod_id: int, *, start: float
@@ -65,11 +65,12 @@ async def get_chats(
 
 # ------------------------------------------------ 수집 진행 상황
 
+
 class _PartProgress(NamedTuple):
     """수집 대상 파트 하나. 세 값 모두 VOD 전체 기준 초."""
 
-    start: float      # 파트의 시작 (file_start - broad_start)
-    end: float        # 파트의 끝
+    start: float  # 파트의 시작 (file_start - broad_start)
+    end: float  # 파트의 끝
     collected: float  # 여기까지 채팅을 받았다
 
 
@@ -110,10 +111,7 @@ async def _part_progress(db: AsyncSession, vod_id: int) -> list[_PartProgress]:
     for part in result:
         part_start = (part.file_start - part.broad_start).total_seconds()
         part_end = part_start + part.duration / 1000  # duration은 밀리초
-        if part.done:
-            collected = part_end
-        else:
-            collected = part_start + (part.last_start_time or 0)
+        collected = part_end if part.done else part_start + (part.last_start_time or 0)
         parts.append(_PartProgress(part_start, part_end, min(collected, part_end)))
     return parts
 

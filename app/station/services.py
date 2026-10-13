@@ -57,10 +57,7 @@ async def list_reviews(
 
     # limit보다 1개 더 가져와서, 남는 게 있으면 다음 페이지가 있다는 뜻.
     stmt = (
-        select(Vod)
-        .where(Vod.bid == bid)
-        .order_by(Vod.vod_id.desc())
-        .limit(limit + 1)
+        select(Vod).where(Vod.bid == bid).order_by(Vod.vod_id.desc()).limit(limit + 1)
     )
     if before is not None:
         stmt = stmt.where(Vod.vod_id < before)

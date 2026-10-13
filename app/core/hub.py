@@ -24,10 +24,12 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-XREAD_BLOCK_MS = 3000   # 새 채팅을 기다리는 시간. 이 안에 없으면 빈 응답을 받고 다시 기다린다
-XREAD_COUNT = 100       # 한 번에 읽는 최대 개수
-QUEUE_MAXSIZE = 1000    # 연결 하나가 밀려 있을 수 있는 최대 채팅 수
-RETRY_DELAY = 1         # redis 읽기 실패 뒤 다시 시도하기까지(초)
+XREAD_BLOCK_MS = (
+    3000  # 새 채팅을 기다리는 시간. 이 안에 없으면 빈 응답을 받고 다시 기다린다
+)
+XREAD_COUNT = 100  # 한 번에 읽는 최대 개수
+QUEUE_MAXSIZE = 1000  # 연결 하나가 밀려 있을 수 있는 최대 채팅 수
+RETRY_DELAY = 1  # redis 읽기 실패 뒤 다시 시도하기까지(초)
 
 # (entry_id, fields)
 StreamEntry = tuple[str, dict[str, str]]
@@ -90,8 +92,11 @@ class ChatHub:
         key = settings.chats_key(bid)
         while True:
             try:
-                resp = await self._r.xread(
-                    {key: last_id}, block=XREAD_BLOCK_MS, count=XREAD_COUNT
+                resp = cast(
+                    list[tuple[str, list[StreamEntry]]],
+                    await self._r.xread(
+                        {key: last_id}, block=XREAD_BLOCK_MS, count=XREAD_COUNT
+                    ),
                 )
             except Exception as e:
                 # redis가 잠깐 안 되더라도 루프는 살려 둔다. 연결들은 그대로 기다린다.
@@ -101,13 +106,12 @@ class ChatHub:
             if not resp:
                 continue
 
-            entries = cast(list[StreamEntry], resp[0][1])
+            entries = resp[0][1]
             for entry_id, fields in entries:
                 last_id = entry_id
                 # 나눠 주는 도중 연결이 끊길 수 있어서 복사본을 돈다.
                 for q in list(self._subs.get(bid, ())):
                     self._put(bid, q, (entry_id, fields))
-
 
     def _put(self, bid: str, q: ChatQueue, entry: StreamEntry) -> None:
         try:

@@ -46,12 +46,17 @@ Data = dict[str, Any]
 
 # ---------------------------------------------------------------- 공통
 
+
 def _user(f: Fields, uid_tag: str = "u", nick_tag: str = "n", prefix: str = "") -> Data:
-    return {f"{prefix}user_id": uid(f.get(uid_tag)), f"{prefix}user_nick": f.get(nick_tag)}
+    return {
+        f"{prefix}user_id": uid(f.get(uid_tag)),
+        f"{prefix}user_nick": f.get(nick_tag),
+    }
 
 
 # ---------------------------------------------------------------- 타입별 변환
 # 주석의 태그 목록은 원본 XML의 자식 순서(t 제외).
+
 
 def _adinbroad(f: Fields) -> Data:
     # status chno [광고 재생 횟수]  쉬는시간(중간광고). 1 시작, 0 종료
@@ -60,9 +65,15 @@ def _adinbroad(f: Fields) -> Data:
 
 def _adballoon(f: Fields) -> Data:
     # bj u n c m em title img_url def_url fs tfn lng mof
-    return {"bid": f.get("bj"), **_user(f), "count": num(f.get("c")),
-            "message1": f.get("m"), "message2": f.get("em"),
-            "img_url": f.get("img_url"), "def_url": f.get("def_url")}
+    return {
+        "bid": f.get("bj"),
+        **_user(f),
+        "count": num(f.get("c")),
+        "message1": f.get("m"),
+        "message2": f.get("em"),
+        "img_url": f.get("img_url"),
+        "def_url": f.get("def_url"),
+    }
 
 
 def _adm_notice(f: Fields) -> Data:
@@ -79,24 +90,40 @@ def _balloon(f: Fields) -> Data:
 
 def _battle_gift(f: Fields) -> Data:
     # type ch bj bj_nick u n c subch fn key title top_fan fan_order
-    return {"kind": f.get("type"), "bid": f.get("bj"), "bj_nick": f.get("bj_nick"),
-            **_user(f), "count": num(f.get("c")),
-            "mission_key": num(f.get("key")), "title": f.get("title")}
+    return {
+        "kind": f.get("type"),
+        "bid": f.get("bj"),
+        "bj_nick": f.get("bj_nick"),
+        **_user(f),
+        "count": num(f.get("c")),
+        "mission_key": num(f.get("key")),
+        "title": f.get("title"),
+    }
 
 
 def _battle_notice(f: Fields) -> Data:
     # type draw winner loser fn key title
-    return {"kind": f.get("type"), "winner": f.get("winner"), "loser": f.get("loser"),
-            "draw": f.get("draw") == "1",
-            "mission_key": num(f.get("key")), "title": f.get("title")}
+    return {
+        "kind": f.get("type"),
+        "winner": f.get("winner"),
+        "loser": f.get("loser"),
+        "draw": f.get("draw") == "1",
+        "mission_key": num(f.get("key")),
+        "title": f.get("title"),
+    }
 
 
 def _mission_settle(f: Fields) -> Data:
     # battle_mission SETTLE:              type bj bj_nick c fn key title
     # challenge_mission CHALLENGE_SETTLE: type subch key title fn c bj bj_nick
-    return {"kind": f.get("type"), "bid": f.get("bj"), "bj_nick": f.get("bj_nick"),
-            "count": num(f.get("c")),
-            "mission_key": num(f.get("key")), "title": f.get("title")}
+    return {
+        "kind": f.get("type"),
+        "bid": f.get("bj"),
+        "bj_nick": f.get("bj_nick"),
+        "count": num(f.get("c")),
+        "mission_key": num(f.get("key")),
+        "title": f.get("title"),
+    }
 
 
 def _challenge_gift(f: Fields) -> Data:
@@ -121,9 +148,12 @@ def _challenge_mission_settle(f: Fields) -> Data:
 
 def _chat(f: Fields) -> Data:
     # m u c mt l n p p2 fw nf nd acfw pn tlk
-    return {"message": f.get("m"), **_user(f),
-            "badge": badge(num(f.get("p"))),
-            "subscriber": sub(tier(num(f.get("p2"))), num(f.get("fw")))}
+    return {
+        "message": f.get("m"),
+        **_user(f),
+        "badge": badge(num(f.get("p"))),
+        "subscriber": sub(tier(num(f.get("p2"))), num(f.get("fw"))),
+    }
 
 
 def _user_only(f: Fields) -> Data:
@@ -133,15 +163,22 @@ def _user_only(f: Fields) -> Data:
 
 def _fanletter(f: Fields) -> Data:
     # bj bjnick u n c image lettertype lettermessage lng  (스티커)
-    return {"bid": f.get("bj"), **_user(f), "count": num(f.get("c")),
-            "message": f.get("lettermessage")}
+    return {
+        "bid": f.get("bj"),
+        **_user(f),
+        "count": num(f.get("c")),
+        "message": f.get("lettermessage"),
+    }
 
 
 def _follow(f: Fields) -> Data:
     # bj u n type period acperiod stier stype lng mof
     # 선물 받은 구독(type 111, 211)은 stype이 없다
-    return {"bid": f.get("bj"), **_user(f),
-            "subscriber": sub(stier(f.get("stier")), num(f.get("period")))}
+    return {
+        "bid": f.get("bj"),
+        **_user(f),
+        "subscriber": sub(stier(f.get("stier")), num(f.get("period"))),
+    }
 
 
 def _ice(f: Fields) -> Data:
@@ -152,43 +189,64 @@ def _ice(f: Fields) -> Data:
 def _ogq(f: Fields) -> Data:
     # ch m gid sid v s sn sf c l mt e fw nf nd acfw pn anm tlk.  sf = "p|p2"
     p, _, p2 = (f.get("sf") or "").partition("|")
-    return {"message": f.get("m"), **_user(f, "s", "sn"),
-            "badge": badge(num(p)),
-            "subscriber": sub(tier(num(p2)), num(f.get("fw"))),
-            "group_id": f.get("gid"), "sticker_id": num(f.get("sid"))}
+    return {
+        "message": f.get("m"),
+        **_user(f, "s", "sn"),
+        "badge": badge(num(p)),
+        "subscriber": sub(tier(num(p2)), num(f.get("fw"))),
+        "group_id": f.get("gid"),
+        "sticker_id": num(f.get("sid")),
+    }
 
 
 def _quick_random(f: Fields) -> Data:
     # sender sendernick chno cnt itemcode
     # sub_random도 같은 모양: sender sendernick chno cnt itemcode rank
-    return {**_user(f, "sender", "sendernick", "from_"),
-            "count": num(f.get("cnt")), "item_code": num(f.get("itemcode"))}
+    return {
+        **_user(f, "sender", "sendernick", "from_"),
+        "count": num(f.get("cnt")),
+        "item_code": num(f.get("itemcode")),
+    }
 
 
 def _quickview(f: Fields) -> Data:
     # sender sendernick u n quickviewtype
-    return {**_user(f, "sender", "sendernick", "from_"), **_user(f, prefix="to_"),
-            "item_code": num(f.get("quickviewtype"))}
+    return {
+        **_user(f, "sender", "sendernick", "from_"),
+        **_user(f, prefix="to_"),
+        "item_code": num(f.get("quickviewtype")),
+    }
 
 
 def _sendogq(f: Fields) -> Data:
     # sendid sendnick recvid recvnick title url ch
-    return {**_user(f, "sendid", "sendnick", "from_"),
-            **_user(f, "recvid", "recvnick", "to_"),
-            "item_name": f.get("title"), "img_url": f.get("url")}
+    return {
+        **_user(f, "sendid", "sendnick", "from_"),
+        **_user(f, "recvid", "recvnick", "to_"),
+        "item_name": f.get("title"),
+        "img_url": f.get("url"),
+    }
 
 
 def _adcon(f: Fields) -> Data:
     # stationadcon, vodadcon: bj v vn cnt default msg chno lng mof
     # vodadcon은 v, vn이 빈 중복 알림이 오기도 한다. 빈 문자열 그대로 둔다
-    return {"bid": f.get("bj"), **_user(f, "v", "vn"), "count": num(f.get("cnt")),
-            "message": f.get("msg"), "def_url": f.get("default")}
+    return {
+        "bid": f.get("bj"),
+        **_user(f, "v", "vn"),
+        "count": num(f.get("cnt")),
+        "message": f.get("msg"),
+        "def_url": f.get("default"),
+    }
 
 
 def _subscription(f: Fields) -> Data:
     # ch s sn r rn b bn it ic is st sp sr  (지정 구독권 선물)
-    return {**_user(f, "s", "sn", "from_"), **_user(f, "r", "rn", "to_"),
-            "item_code": num(f.get("it"))}
+    return {
+        **_user(f, "s", "sn", "from_"),
+        **_user(f, "r", "rn", "to_"),
+        "item_code": num(f.get("it")),
+    }
 
 
 Converter = Callable[[Fields], Data]
@@ -249,6 +307,7 @@ def _convert(tag: str, fields: Fields) -> Data | None:
 
 # ---------------------------------------------------------------- 파싱
 
+
 def parse_chat_xml(
     xml_text: str,
     *,
@@ -294,7 +353,9 @@ def parse_chat_xml(
             logger.debug("[SKIP] vod_id=%d %s t 태그 없음", vod_id, tag)
             continue
 
-        fields = {child.tag: (child.text or "") for child in el if child.tag != TIME_TAG}
+        fields = {
+            child.tag: (child.text or "") for child in el if child.tag != TIME_TAG
+        }
         data = _convert(tag, fields)
         if data is None:
             # 모르는 타입: 원본 태그 그대로, t까지 전부
@@ -313,9 +374,7 @@ def parse_chat_xml(
         )
 
     if unknown:
-        logger.info(
-            "[%d] 미등록 채팅 타입 발견: %s", vod_id, sorted(unknown)
-        )
+        logger.info("[%d] 미등록 채팅 타입 발견: %s", vod_id, sorted(unknown))
 
     return rows
 

@@ -5,17 +5,18 @@
 1. CHAT_COLLECT_SINCE 이후 VOD 중 채팅 수집이 안 끝난 것을
     오래된 순으로 고르고(크론은 --count개까지), 각 VOD의 미완료 파트를 순서대로 처리한다.
 2. 파트 단위 advisory lock을 걸어 동시성 제어.
-3. last_start_time부터 chat_duration(기본 300초) 단위로 
+3. last_start_time부터 chat_duration(기본 300초) 단위로
     영상 파트가 끝나는 시점까지 채팅을 긁는다.
 4. 구간(chat_duration)마다 해당 범위를 DELETE 후 INSERT 한다.
-    chats에는 자연키가 없어 ON CONFLICT를 못 쓰므로, 이 방식으로 멱등성을 만든다.   
+    chats에는 자연키가 없어 ON CONFLICT를 못 쓰므로, 이 방식으로 멱등성을 만든다.
 5. 구간 하나가 끝날 때마다 진행 상태를 커밋한다. 중단 지점이 곧 재개 지점.
 """
 
+import logging
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import datetime
-import logging
-from typing import AsyncGenerator, Literal
+from typing import Literal
 
 import httpx
 from psycopg import AsyncConnection
@@ -27,9 +28,9 @@ from app.utils.tz import KST
 
 logger = logging.getLogger(__name__)
 
-REQUEST_DELAY = 1.0     # 초. 채팅 요청 사이 텀
+REQUEST_DELAY = 1.0  # 초. 채팅 요청 사이 텀
 CHAT_LIMIT_SECONDS = 18000  # soop이 채팅을 18000초 단위로 관리하기 때문에
-                            # 이것 이후로는 404 대신 500이 온다(확신)
+# 이것 이후로는 404 대신 500이 온다(확신)
 CHAT_COLLECT_SINCE = datetime(2026, 9, 1, tzinfo=KST)  # 크론 자동 수집 기준일.
 
 # ---------------------------------------------------------------- SQL
@@ -103,6 +104,7 @@ VOD_BID_SQL = "SELECT bid FROM vods WHERE vod_id = %s"
 
 # ---------------------------------------------------------------- 수집
 
+
 async def collect_part(
     conn: AsyncConnection,
     *,
@@ -147,19 +149,32 @@ async def collect_part(
                 if e_type == "empty":
                     logger.info(
                         "[EMPTY] vod_id=%d file_order=%d t=%d 채팅 없는 구간(404). 건너뜀",
-                        vod_id, file_order, start,
+                        vod_id,
+                        file_order,
+                        start,
                     )
                     xml = ""
                 else:
                     if e_type == "tail":
                         logger.info(
-                            "[TAIL] vod_id=%d file_order=%d t=%d 마지막 구간 응답 없음 (남은 %.1fs). 완료 처리: %s",
-                            vod_id, file_order, start, remaining, e,
+                            (
+                                "[TAIL] vod_id=%d file_order=%d t=%d"
+                                " 마지막 구간 응답 없음 (남은 %.1fs)."
+                                " 완료 처리: %s"
+                            ),
+                            vod_id,
+                            file_order,
+                            start,
+                            remaining,
+                            e,
                         )
                     else:
                         logger.warning(
                             "[RETRY] vod_id=%d file_order=%d t=%d 조회 실패: %s",
-                            vod_id, file_order, start, e,
+                            vod_id,
+                            file_order,
+                            start,
+                            e,
                         )
                     # 실패면 쿨다운용으로 진행 위치는 그대로 두고 updated_at만 갱신하고,
                     # 마지막 구간에 채팅 데이터가 없어서 실패한 경우면 done으로 기록한다.
@@ -216,7 +231,7 @@ async def collect_part(
 @asynccontextmanager
 async def _part_lock(
     conn: AsyncConnection, vod_id: int, file_order: int
-) -> AsyncGenerator[bool, None]:
+) -> AsyncGenerator[bool]:
     """파트 단위 advisory lock. 잡았으면 True를 넘기고, 끝나면 푼다.
 
     채팅 수집기가 동시에 같은 파트의 채팅을 수집하지 않도록 락.
@@ -282,15 +297,28 @@ async def collect_vod_chats(conn: AsyncConnection, vod_id: int) -> int:
 
     parts = await cur.fetchall()
     if not parts:
-        logger.info("vod_id=%d 수집할 파트 없음 (이미 완료했거나 파트가 없는 VOD)", vod_id)
+        logger.info(
+            "vod_id=%d 수집할 파트 없음 (이미 완료했거나 파트가 없는 VOD)", vod_id
+        )
 
     total = 0
-    for (vod_id, file_order, chat_url, duration, file_start,
-        broad_start, chat_duration, last_start_time) in parts:
+    for (
+        vod_id,
+        file_order,
+        chat_url,
+        duration,
+        file_start,
+        broad_start,
+        chat_duration,
+        last_start_time,
+    ) in parts:
         offset_base = (file_start - broad_start).total_seconds()
         logger.info(
             "vod_id=%d file_order=%d 시작 (offset_base=%.0fs, t=%ds부터)",
-            vod_id, file_order, offset_base, last_start_time,
+            vod_id,
+            file_order,
+            offset_base,
+            last_start_time,
         )
         total += await collect_part(
             conn,

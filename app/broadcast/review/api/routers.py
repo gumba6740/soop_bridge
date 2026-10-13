@@ -4,10 +4,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query
 
-from app.core.deps import DBDep, RDep
 from app.broadcast.review.api.schemas.chat_schemas import ChatWindowOut
 from app.broadcast.review.api.schemas.vod_schemas import VodDetailOut
 from app.broadcast.review.api.services import chat_services, vod_services
+from app.core.deps import DBDep, RDep
 
 router = APIRouter(prefix="/review", tags=["review"])
 

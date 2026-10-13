@@ -28,6 +28,7 @@ TSTZ = DateTime(timezone=True)
 
 # ---------------------------------------------------------------- vods
 
+
 class Vod(Base):
     __tablename__ = "vods"
 
@@ -65,18 +66,22 @@ class Vod(Base):
         order_by="VodFile.file_order",
         lazy="raise",
     )
+
+
 # 워터마크 조회용: SELECT MAX(vod_id) FROM vods WHERE bid = ?
 Index("idx_vods_bid_vod_id", Vod.bid, Vod.vod_id.desc())
 
 
 # ---------------------------------------------- vod_files
 
+
 class VodFile(Base):
     __tablename__ = "vod_files"
     __table_args__ = (PrimaryKeyConstraint("vod_id", "file_order"),)
 
     vod_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("vods.vod_id", ondelete="CASCADE"),
+        BigInteger,
+        ForeignKey("vods.vod_id", ondelete="CASCADE"),
     )
     file_order: Mapped[int] = mapped_column(SmallInteger)
     duration: Mapped[int] = mapped_column(  # 밀리초
@@ -90,6 +95,7 @@ class VodFile(Base):
 
 
 # -------------------------------------- vod_fetch_failures
+
 
 class VodFetchFailure(Base):
     __tablename__ = "vod_fetch_failures"
@@ -109,6 +115,7 @@ class VodFetchFailure(Base):
 
 # ------------------------------------------------- chat_progress
 
+
 class ChatProgress(Base):
     __tablename__ = "chat_progress"
     __table_args__ = (
@@ -120,9 +127,7 @@ class ChatProgress(Base):
             ondelete="CASCADE",
         ),
         # 부분 인덱스: 미완료 행만 담는다.
-        Index(
-            "idx_chat_progress_pending", "vod_id", postgresql_where=text("NOT done")
-        ),
+        Index("idx_chat_progress_pending", "vod_id", postgresql_where=text("NOT done")),
     )
 
     vod_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -135,6 +140,7 @@ class ChatProgress(Base):
 
 
 # ---------------------------------------------------------------- chats
+
 
 class Chat(Base):
     """data의 키는 타입마다 다름. docs/review_chat_types.md 참고.
@@ -150,19 +156,18 @@ class Chat(Base):
     )
 
     # GENERATED ALWAYS AS IDENTITY
-    id: Mapped[int] = mapped_column(
-        BigInteger, Identity(always=True), primary_key=True
-    )
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
     vod_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("vods.vod_id", ondelete="CASCADE")
     )
     file_order: Mapped[int] = mapped_column(SmallInteger)  # 구간 단위 재삽입에 필요
     type: Mapped[str] = mapped_column(Text)
     time_offset: Mapped[float] = mapped_column(Double)  # float8
-    data: Mapped[dict[str, Any]] = mapped_column(JSONB) 
+    data: Mapped[dict[str, Any]] = mapped_column(JSONB)
 
 
 # ------------------------------------------------------- vod_views
+
 
 class VodView(Base):
     """우리 서비스에서 집계하는 조회수. SOOP 데이터와 주인이 달라서 분리."""
@@ -179,6 +184,7 @@ class VodView(Base):
 
 
 # -------------------------------------------------------- streamers
+
 
 class Streamer(Base):
     """수집 대상 스트리머. 목록은 nick 오름차순으로 읽는다."""

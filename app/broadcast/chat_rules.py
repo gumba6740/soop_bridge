@@ -7,7 +7,9 @@
     app/broadcast/live/shared/chat_parser.py    (라이브)
 
 기존 다시보기 데이터를 옮긴 마이그레이션(alembic 261012_0030)도 같은 규칙을 SQL로 갖고 있다.
-규칙을 바꾸면 이미 저장된 데이터와 달라진다. 근거는 docs/review_chat_types.md, docs/live_chat_packets.md.
+규칙을 바꾸면 이미 저장된 데이터와 달라진다.
+
+근거는 docs/review_chat_types.md, docs/live_chat_packets.md.
 """
 
 import re
@@ -18,11 +20,11 @@ _SESSION_SUFFIX = re.compile(r"\(\d+\)$")
 _INT = re.compile(r"^-?\d+$")
 
 # 플래그1(p) 비트
-P_STREAMER = 1 << 2               # 방송 주인
-P_MANAGER = (1 << 6) | (1 << 8)   # 매니저 (둘 중 어느 것인지 모름)
-P_VIP = 1 << 15                   # 열혈
-P_FAN = 1 << 5                    # 팬
-P_SUPPORTER = 1 << 20             # 서포터
+P_STREAMER = 1 << 2  # 방송 주인
+P_MANAGER = (1 << 6) | (1 << 8)  # 매니저 (둘 중 어느 것인지 모름)
+P_VIP = 1 << 15  # 열혈
+P_FAN = 1 << 5  # 팬
+P_SUPPORTER = 1 << 20  # 서포터
 # 플래그2(p2) 비트
 P2_PLUS = 1 << 19
 P2_BASIC = 1 << 18
