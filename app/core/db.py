@@ -13,6 +13,7 @@ engine = create_async_engine(
     pool_pre_ping=True,  # 풀에서 꺼낼 때 끊긴 커넥션인지 확인 (DB 재시작 대비)
     pool_size=5,  # 평소 살려둘 커넥션 수
     max_overflow=10,  # 몰릴 때 추가로 허용할 수. 반납 시 바로 닫힘
+    connect_args={"application_name": "api"},  # pg_stat_activity에서 연결 구분용
 )
 
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
