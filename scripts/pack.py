@@ -20,13 +20,7 @@ DRY_RUN = "-p" in sys.argv  # True면 압축하지 않고 미리보기만 출력
 
 # 1. 전역 가져오기: 루트 바로 아래 폴더/파일 (폴더면 하위 전체)
 INCLUDE: list[str] = [
-    # "app/",
-    "tests/",
-    # "docker/",
-    # "docs/",
-    # "scripts/collect.sh",
-    # "docker-compose.yml",
-    # "pyproject.toml",
+    # ex) "app/",
 ]
 
 # 2. 전역 빼기: 이름/패턴. 경로의 어느 위치에 있든 적용
