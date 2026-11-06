@@ -50,6 +50,7 @@ class ChatHub:
 
         루프는 "지금 스트림의 마지막 항목" 다음부터 읽는다. 그 전 채팅은 호출부가 따로 읽는다.
         """
+        # MAXSIZE를 넘어가면 해당 큐가 삭제됨.
         q: ChatQueue = asyncio.Queue(maxsize=QUEUE_MAXSIZE)
         # 생방송 중일 때 and 해당 방송에 첫 시청 요청이 있었을 때 이 조건을 만족함.
         if bid not in self._readers:

@@ -3,7 +3,7 @@
     python -m app.broadcast.review.collector vods
     python -m app.broadcast.review.collector vods --bid beadyo97
     python -m app.broadcast.review.collector vods --retry
-    python -m app.broadcast.eview.collector vods --sweep --bid X
+    python -m app.broadcast.review.collector vods --sweep --bid X
 
     python -m app.broadcast.review.collector chats --count <int>
     python -m app.broadcast.review.collector chats --vod-id <vod_id>
@@ -69,7 +69,10 @@ async def _targets(conn: AsyncConnection, bid: str | None) -> list[tuple[str, st
     rows: list[tuple[str, str]] = [(n, b) for n, b in await cur.fetchall()]
     if bid is None:
         return rows
-    nick = next((n for n, b in rows if b == bid), bid)
+    nick = next((n for n, b in rows if b == bid), None)
+    if nick is None:
+        logger.warning("streamers에 없는 bid: %s. 그대로 진행", bid)
+        nick = bid
     return [(nick, bid)]
 
 

@@ -5,7 +5,7 @@ ipython -i scripts/shell.py
 """
 # ruff: noqa: F401
 import atexit
-from sqlalchemy import func, select, text
+from sqlalchemy import *
 from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
@@ -17,18 +17,19 @@ from app.models import (
     Vod,
     VodFetchFailure,
     VodFile,
+    Streamer,
 )
 
-s = SessionLocal()
+db = SessionLocal()
 r = redis_client
 
 
-def _close_on_exit(session=s, redis=r, eng=engine) -> None:
+def _close_on_exit(db=db, redis=r, eng=engine) -> None:
     """ipython을 exit로 종료 시 발생하는 에러 방지 함수."""
     from IPython.core.async_helpers import get_asyncio_loop
 
     async def _close() -> None:
-        await session.close()
+        await db.close()
         await redis.aclose()
         await eng.dispose()
 

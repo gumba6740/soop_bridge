@@ -57,6 +57,7 @@ CHAT_TTL_AFTER_END = 600  # 방송이 끝난 뒤 채팅 스트림을 남겨둘 �
 VIDEO_QUALITIES = ("sd", "hd")  # 360p, 540p. 웹 경로로는 540p가 최대
 START_STAGGER = 0.5  # watch를 띄우는 간격(초). 요청이 한순간에 몰리지 않게
 STATS_INTERVAL = 60  # live-collector에서 soop으로 나가는 요청 수를 셀 간격 (초)
+RECONNECT_DELAY = 1
 
 
 def _kst_iso(text: str) -> str:
@@ -256,7 +257,7 @@ async def watch(r: Redis, bid: str) -> None:
                 # 여기 오면 0007을 받은 것. 다음 반복에서 접속 정보를 다시 보고 종료인지 판단한다.
                 logger.info("bid=%s 0007 수신 (%d건). 방송 상태 재확인", bid, count)
                 # 접속하자마자 0007이 반복해서 오는 경우를 대비해 잠깐 쉰다.
-                await asyncio.sleep(1)
+                await asyncio.sleep(RECONNECT_DELAY)
                 reconnect = True
 
             except Exception as e:

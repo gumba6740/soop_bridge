@@ -28,10 +28,11 @@ class Settings(BaseSettings):
     # ------------------------------------------------- Redis
     redis_host: str = "localhost"
     redis_port: int = 6380
+    redis_db: int = 0
 
     @property
     def redis_url(self) -> str:
-        return f"redis://{self.redis_host}:{self.redis_port}"
+        return f"redis://{self.redis_host}:{self.redis_port}/{self.redis_db}"
 
     # 온디맨드 채팅 수집 큐. API가 넣고 collector 워커가 꺼낸다.
     @property

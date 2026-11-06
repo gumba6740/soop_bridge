@@ -35,6 +35,7 @@ PING_INTERVAL = 60  # 초
 RECV_TIMEOUT = 600  # 초
 # 0007 뒤 이 시간(초) 안에 0007이 또 오면 짝으로 보고 연결을 유지한다.
 STATE_PAIR_WINDOW = 1
+JOIN_DELAY = 1
 
 
 def _make_packets(info: dict[str, Any]) -> tuple[bytes, bytes, bytes]:
@@ -118,7 +119,7 @@ async def stream_live_chats(bid: str, info: dict[str, Any]) -> AsyncGenerator[by
         await ws.send(connect_packet)
         # connect 이후 지연 없이 너무 빠르게 join 신호를 보내면 작동하지 않음.
         # 핸드셰이크 순서가 꼬이는 것으로 추측.
-        await asyncio.sleep(1)
+        await asyncio.sleep(JOIN_DELAY)
         await ws.send(join_packet)
 
         logger.info("bid=%s %s님의 채팅 수신 시작", bid, strmr_nick)
@@ -184,13 +185,12 @@ async def stream_live_chats(bid: str, info: dict[str, Any]) -> AsyncGenerator[by
             await asyncio.gather(ping_task, return_exceptions=True)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     import argparse
 
     # 개발용 실행이라 여기서만 app.broadcast.live를 쓴다. 모듈 본체는 core 밖을 import하지 않는다.
     import json
 
-    # 개발용 실행이라 여기서만 app.broadcast.live를 쓴다. 모듈 본체는 core 밖을 import하지 않는다.
     from app.broadcast.live.shared.chat_parser import parse_packet, to_chat
     from app.core.log import setup_logging
     from app.core.soop_clients.live_clients.shared import aclose, get_live_info

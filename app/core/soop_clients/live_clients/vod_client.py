@@ -35,7 +35,7 @@ CDN_TYPE_MAPPING = {
 
 
 async def get_aid(bid: str, bno: str, quality: str) -> str | None:
-    """화질별 재생 토큰(aid)을 받는다."""
+    """접속 정보 요청 후 응답에서 화질별 재생 토큰(aid)을 꺼낸다."""
     channel = await post_live_api(
         bid,
         {"type": "aid", "bid": bid, "bno": bno, "pwd": "", "quality": quality},

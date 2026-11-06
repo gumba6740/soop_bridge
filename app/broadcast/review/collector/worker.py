@@ -25,6 +25,9 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
+BLPOP_TIMEOUT = 20
+
+
 async def _handle(raw: str) -> None:
     """vod_id를 하나 받아서 채팅 수집 처리."""
     try:
@@ -52,7 +55,7 @@ async def run_worker() -> None:
         await _recover(r, queue, pending)
         while True:
             # 일감이 올 때까지 잠든다. timeout=0은 무한 대기.
-            item = await r.blpop([queue], timeout=20)
+            item = await r.blpop([queue], timeout=BLPOP_TIMEOUT)
             if item is None:
                 continue
             _, raw_id = cast(tuple[str, str], item)
@@ -61,8 +64,8 @@ async def run_worker() -> None:
                 await _handle(raw_id)  #
             except asyncio.CancelledError:
                 # 종료 신호로 중단됨. pending은 그대로 두고 큐 맨 앞에 돌려놓는다.
-                logger.warning("종료 신호로 중단. 큐에 되돌려 놓음: %s", raw_id)
                 await r.lpush(queue, raw_id)
+                logger.warning("종료 신호로 중단. 큐에 되돌려 놓음: %s", raw_id)
                 raise
             except Exception:
                 # 일감 하나의 실패가 워커 전체를 죽이지 않게 격리.

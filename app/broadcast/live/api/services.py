@@ -3,7 +3,7 @@
 import asyncio
 import json
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from datetime import datetime
 from typing import cast
 
@@ -82,7 +82,7 @@ def _sse(entry_id: str, fields: dict[str, str]) -> str:
     )
 
 
-async def chat_events(r: Redis, hub: ChatHub, bid: str) -> AsyncIterator[str]:
+async def chat_events(r: Redis, hub: ChatHub, bid: str) -> AsyncGenerator[str]:
     """채팅 SSE 본문. 처음엔 최근 INITIAL_CHATS개를, 그 뒤로는 새 채팅을 보낸다.
 
     - 방송이 끝나면 "end" 이벤트를 보내고 닫는다.

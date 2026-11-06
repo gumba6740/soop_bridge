@@ -33,7 +33,3 @@ temp/
 /benchmarks/chat/discard/
 /benchmarks/scripts/
 /sqls/*
-
-
-#
-/tests/
