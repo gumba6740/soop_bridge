@@ -7,7 +7,7 @@ ARG TARGETARCH
 
 RUN set -eux; \
     apt-get update; \
-    # tzdata: ZoneInfo("Asia/Seoul")와 supercronic의 TZ 처리에 필요하다.
+    # tzdata: supercronic의 TZ 처리용. 기본 이미지에 이미 있을 수 있음(확인 전).
     apt-get install -y --no-install-recommends curl ca-certificates tzdata; \
     rm -rf /var/lib/apt/lists/*; \
     arch="${TARGETARCH:-amd64}"; \
@@ -41,7 +41,7 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --only-group review_collector
 
 COPY app ./app
-COPY scripts ./scripts
+COPY scripts/collect.sh ./scripts/collect.sh
 COPY docker/collector.cron /etc/collector.cron
 RUN chmod +x scripts/collect.sh
 
