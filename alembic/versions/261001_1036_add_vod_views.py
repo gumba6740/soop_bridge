@@ -3,7 +3,6 @@
 Revision ID: 261001_1036
 Revises: 
 Create Date: 2026-10-01 10:36:06.792082
-
 """
 from typing import Sequence, Union
 
@@ -13,7 +12,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '261001_1036'
-down_revision: Union[str, Sequence[str], None] = None
+down_revision: Union[str, Sequence[str], None] = '260930_0000'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
