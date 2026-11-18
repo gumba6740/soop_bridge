@@ -52,5 +52,8 @@ class Settings(BaseSettings):
     def chats_key(self, bid: str) -> str:
         return f"soop:live:{bid}:chats"
 
+    # CORS
+    cors_origins: list[str] = []
+
 
 settings = Settings()

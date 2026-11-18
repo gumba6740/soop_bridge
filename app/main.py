@@ -7,11 +7,24 @@ from app.core.exc import BaseAppException, exception_handler
 from app.core.lifespan import lifespan
 from app.core.log import setup_logging
 from app.station.routers import router as station_router
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.core.config import settings
 
 setup_logging()
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_methods=["GET"],
+    allow_headers=["*"],
+)
+
 
 app.include_router(station_router)
 app.include_router(review_router)

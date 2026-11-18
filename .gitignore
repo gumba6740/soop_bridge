@@ -33,3 +33,5 @@ temp/
 /benchmarks/chat/discard/
 /benchmarks/scripts/
 /sqls/*
+
+/jsons/
