@@ -1,15 +1,14 @@
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.broadcast.live.api.routers import router as live_router
 from app.broadcast.review.api.routers import router as review_router
+from app.core.config import settings
 from app.core.exc import BaseAppException, exception_handler
 from app.core.lifespan import lifespan
 from app.core.log import setup_logging
 from app.station.routers import router as station_router
-from fastapi.middleware.cors import CORSMiddleware
-
-from app.core.config import settings
 
 setup_logging()
 
