@@ -47,11 +47,12 @@ NEXT_CHAT_TARGETS_SQL = """
     AND f.file_start IS NOT NULL
     AND f.duration > 0
     AND (p.done IS NULL OR NOT p.done)
-    AND v.broad_start >= %s
+    AND v.broad_start >= %(since)s
+    AND (%(bid)s::text IS NULL OR v.bid = %(bid)s)
     AND (p.updated_at IS NULL OR p.updated_at < now() - interval '1 hour')
     GROUP BY v.vod_id
     ORDER BY v.broad_start ASC
-    LIMIT %s
+    LIMIT %(limit)s
 """
 
 CHAT_PARTS_SQL = """
@@ -268,13 +269,20 @@ def _classify_error(
     return "retry"
 
 
-async def next_chat_targets(conn: AsyncConnection, limit: int) -> list[int]:
+async def next_chat_targets(
+    conn: AsyncConnection, limit: int, bid: str | None = None
+) -> list[int]:
     """CHAT_COLLECT_SINCE 이후 VOD 중 미완료인 것을 오래된 순으로 최대 limit개 고른다(크론).
+
+    bid를 주면 그 스트리머의 VOD만 고른다.
 
     Return:
         vod_id 리스트. 수집할 VOD가 없으면 빈 리스트.
     """
-    cur = await conn.execute(NEXT_CHAT_TARGETS_SQL, (CHAT_COLLECT_SINCE, limit))
+    cur = await conn.execute(
+        NEXT_CHAT_TARGETS_SQL,
+        {"since": CHAT_COLLECT_SINCE, "limit": limit, "bid": bid},
+    )
     return [row[0] for row in await cur.fetchall()]
 
 

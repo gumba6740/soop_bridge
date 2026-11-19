@@ -40,8 +40,8 @@ def calls(monkeypatch, targets) -> list[tuple]:
         record.append(("retry",))
         return 1
 
-    async def next_chat_targets(conn, limit):
-        record.append(("targets", limit))
+    async def next_chat_targets(conn, limit, bid):
+        record.append(("targets", limit, bid))
         return targets
 
     async def collect_vod_chats(conn, vod_id):
@@ -237,7 +237,7 @@ async def test_run_vods_skips_when_locked(conn, other, calls, caplog):
     assert "vods: 이전 실행이 아직 진행 중" in caplog.text
 
 
-# ---------------------------------------------------------------- run_chats
+# ----------------------------------------------------------- run_chats
 
 
 @pytest.mark.asyncio
@@ -245,18 +245,28 @@ async def test_run_chats(conn, calls, targets):
     """성공 케이스. count 개까지 대상을 골라 차례로 수집하는지."""
     targets.extend([1001, 1002])
 
-    await collector_main.run_chats(conn, count=3, vod_id=None)
+    await collector_main.run_chats(conn, count=3, vod_id=None, bid=None)
 
-    assert calls == [("targets", 3), ("chats", 1001), ("chats", 1002)]
+    assert calls == [("targets", 3, None), ("chats", 1001), ("chats", 1002)]
+
+
+@pytest.mark.asyncio
+async def test_run_chats_one_bid(conn, calls, targets):
+    """bid 를 주면 그 bid 로 대상을 고르는지."""
+    targets.append(1001)
+
+    await collector_main.run_chats(conn, count=3, vod_id=None, bid="b1")
+
+    assert calls == [("targets", 3, "b1"), ("chats", 1001)]
 
 
 @pytest.mark.asyncio
 async def test_run_chats_nothing_to_collect(conn, calls, caplog):
     """대상이 없으면 수집 없이 끝나고 그렇다고 남기는지."""
     with caplog.at_level(logging.INFO):
-        await collector_main.run_chats(conn, count=3, vod_id=None)
+        await collector_main.run_chats(conn, count=3, vod_id=None, bid=None)
 
-    assert calls == [("targets", 3)]
+    assert calls == [("targets", 3, None)]
     assert "수집할 VOD 없음" in caplog.text
 
 
@@ -266,7 +276,7 @@ async def test_run_chats_skips_when_locked(conn, other, calls, targets, caplog):
     targets.append(1001)
     await _try_lock(other, CHATS)
 
-    await collector_main.run_chats(conn, count=3, vod_id=None)
+    await collector_main.run_chats(conn, count=3, vod_id=None, bid=None)
 
     assert calls == []
     assert "chats: 이전 실행이 아직 진행 중" in caplog.text
@@ -277,7 +287,7 @@ async def test_run_chats_one_vod_ignores_lock(conn, other, calls):
     """vod_id 를 주면 전역 락과 상관없이 그 VOD를 수집하는지."""
     await _try_lock(other, CHATS)
 
-    await collector_main.run_chats(conn, count=None, vod_id=1000)
+    await collector_main.run_chats(conn, count=None, vod_id=1000, bid=None)
 
     assert calls == [("chats", 1000)]
 
@@ -294,6 +304,7 @@ async def test_run_chats_one_vod_ignores_lock(conn, other, calls):
         ["chats"],  # --count, --vod-id 중 하나는 있어야 함
         ["chats", "--count", "3", "--vod-id", "1000"],  # 둘 중 하나만
         ["chats", "--count", "0"],  # 1 이상
+        ["chats", "--vod-id", "1000", "--bid", "b1"],
         [],  # 명령이 없음
     ],
 )
@@ -333,7 +344,8 @@ async def test_main_vods(db, monkeypatch):
         (["vods", "--retry"], [("retry",)]),
         (["vods", "--sweep", "--bid", "b1"], [("sweep", "b1")]),
         (["chats", "--vod-id", "1000"], [("chats", 1000)]),
-        (["chats", "--count", "3"], [("targets", 3)]),
+        (["chats", "--count", "3"], [("targets", 3, None)]),
+        (["chats", "--count", "3", "--bid", "b1"], [("targets", 3, "b1")]),
         (["worker"], [("worker",)]),
     ],
 )

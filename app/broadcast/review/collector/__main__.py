@@ -6,6 +6,7 @@
     python -m app.broadcast.review.collector vods --sweep --bid X
 
     python -m app.broadcast.review.collector chats --count <int>
+    python -m app.broadcast.review.collector chats --count <int> --bid <bid>
     python -m app.broadcast.review.collector chats --vod-id <vod_id>
 
     python -m app.broadcast.review.collector worker
@@ -111,7 +112,7 @@ async def run_vods(
 
 
 async def run_chats(
-    conn: AsyncConnection, *, count: int | None, vod_id: int | None
+    conn: AsyncConnection, *, count: int | None, vod_id: int | None, bid: str | None
 ) -> None:
     # 수동: 지정한 VOD. 기준일/쿨다운 무시, 전역 락 없음.
     if vod_id is not None:
@@ -120,15 +121,15 @@ async def run_chats(
 
     assert count is not None  # argparse가 --count/--vod-id 중 하나를 강제한다
 
-    # 크론: 미완료 VOD를 최대 count개 골라서 하나씩 수집.
+    # 크론: 미완료 VOD를 최대 count개 골라서 하나씩 수집. bid가 있으면 그 스트리머만.
     async with global_lock(conn, CHATS_LOCK_KEY) as ok:
         if not ok:
             logger.warning("chats: 이전 실행이 아직 진행 중. 이번 실행 건너뜀")
             return
 
-        targets = await next_chat_targets(conn, count)
+        targets = await next_chat_targets(conn, count, bid)
         if not targets:
-            logger.info("수집할 VOD 없음")
+            logger.info("수집할 VOD 없음%s", f" (bid={bid})" if bid else "")
             return
 
         for i, target in enumerate(targets, 1):
@@ -159,6 +160,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--count", type=int, help="미완료 VOD를 최대 이만큼 수집 (크론)"
     )
     target.add_argument("--vod-id", type=int, help="이 VOD만 수집 (기준일/쿨다운 무시)")
+    p.add_argument("--bid", help="--count와 함께: 이 스트리머의 VOD만 고른다")
 
     sub.add_parser("worker", help="온디맨드 채팅 수집 워커 (redis 큐 대기)")
 
@@ -179,6 +181,8 @@ async def main() -> None:
         parser.error("--sweep은 --bid와 같이 써야 한다")
     if args.command == "chats" and args.count is not None and args.count < 1:
         parser.error("--count는 1 이상이어야 한다")
+    if args.command == "chats" and args.bid and args.vod_id is not None:
+        parser.error("--vod-id와 --bid는 같이 쓸 수 없습니다.")
 
     try:
         if args.command == "worker":
@@ -193,7 +197,9 @@ async def main() -> None:
             if args.command == "vods":
                 await run_vods(conn, bid=args.bid, retry=args.retry, sweep=args.sweep)
             elif args.command == "chats":
-                await run_chats(conn, count=args.count, vod_id=args.vod_id)
+                await run_chats(
+                    conn, count=args.count, vod_id=args.vod_id, bid=args.bid
+                )
     finally:
         # httpx 클라이언트는 만든 이벤트 루프 안에서 닫아야 한다.
         await aclose()
