@@ -1,1 +1,7 @@
-# 현재 수동 수집만 사용 중.
+# review-collector 크론 (supercronic). TZ=Asia/Seoul.
+# 형식: 분 시 일 월 요일 명령
+# 로그 확인: docker compose logs -f review-collector
+
+10 8 * * * RUN_SOURCE=cron python -m app.broadcast.review.collector vods
+
+11 9 * * * RUN_SOURCE=cron python -m app.broadcast.review.collector chats --count 2 --bid ecvhao
