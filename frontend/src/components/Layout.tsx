@@ -12,7 +12,7 @@ export default function Layout() {
             SOOP Bridge
           </Link>
           <span className="hidden text-sm text-zinc-500 sm:inline">
-            다시보기 채팅 · 실시간 채팅 모아 보기
+            다시보기 · 생방송 모아 보기
           </span>
         </div>
       </header>
