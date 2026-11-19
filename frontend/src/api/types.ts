@@ -49,6 +49,12 @@ export interface VodDetail extends VodListItem {
     bid: string;
     nick: string;
     files: VodFile[];
+    views: number;
+}
+
+/** POST /review/{vod_id}/view. 올린 뒤의 조회수 */
+export interface ViewCount {
+    views: number;
 }
 
 /**

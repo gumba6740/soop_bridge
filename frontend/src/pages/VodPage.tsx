@@ -6,9 +6,9 @@
 //   → useReplayChats가 그 시간에 필요한 채팅 구간을 받아 두고, time까지의 채팅을 돌려줌
 //   → ChatList가 그림
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useParams } from "react-router";
-import { getVod } from "../api/client";
+import { getVod, addView } from "../api/client";
 import type { VodDetail } from "../api/types";
 import ChatList, { ChatPanel } from "../components/ChatList";
 import { ErrorView, Loading, Message } from "../components/Status";
@@ -16,6 +16,7 @@ import VodPlayer from "../components/VodPlayer";
 import { useFetch } from "../hooks/useFetch";
 import { useReplayChats } from "../hooks/useReplayChats";
 import { formatClock, formatDate, formatDuration } from "../lib/format";
+import { isAdmin } from "../lib/admin";
 
 export default function VodPage() {
   const vodId = Number(useParams().vodId);
@@ -31,6 +32,18 @@ export default function VodPage() {
 function VodView({ vod }: { vod: VodDetail }) {
   const [time, setTime] = useState(0);
   const { chats, status } = useReplayChats(vod.vod_id, vod.total_duration / 1000, time);
+  const [admin] = useState(isAdmin);
+  // 처음엔 상세 응답의 조회수, 조회수 요청이 성공하면 올라간 값으로 바꾼다
+  const [views, setViews] = useState(vod.views);
+
+  // 페이지를 열 때마다 조회수 +1. 관리자 브라우저는 보내지 않는다.
+  // 개발 모드(StrictMode)에서는 effect가 두 번 돌아서 2씩 오른다. 배포 빌드는 1.
+  useEffect(() => {
+    if (admin) return;
+    addView(vod.vod_id)
+      .then((res) => setViews(res.views))
+      .catch(() => {}); // 조회수 실패는 화면에 알리지 않는다
+  }, [vod.vod_id, admin]);
 
   const statusText = {
     loading: <span className="text-xs text-zinc-500">불러오는 중…</span>,
@@ -52,6 +65,8 @@ function VodView({ vod }: { vod: VodDetail }) {
             </Link>
             <span>{formatDate(vod.broad_start)}</span>
             <span>{formatDuration(vod.total_duration)}</span>
+            <span>조회 {views.toLocaleString()}</span>
+            {admin && <span className="text-xs text-amber-300">관리자</span>}
           </div>
           {vod.hashtags.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-1.5">

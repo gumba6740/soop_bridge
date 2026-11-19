@@ -1,8 +1,9 @@
 // REST API를 부르는 함수 모음.
 // 화면 코드는 fetch를 직접 쓰지 않고 여기 있는 함수만 부른다.
-//
-// 주소 앞의 /api 는 nginx(배포)나 Vite 프록시(개발)가 떼고 FastAPI로 넘긴다.
-//   getStation("ecvhao") → 브라우저: GET /api/station/ecvhao → FastAPI: GET /station/ecvhao
+
+// 요청 주소 = API_BASE + 경로
+//   개발: API_BASE = "/api" → Vite 프록시가 /api를 떼고 FastAPI로 넘김
+//   배포: API_BASE = VITE_API_BASE → nginx → FastAPI
 
 import type {
   ApiErrorBody,
@@ -10,6 +11,7 @@ import type {
   LiveDetail,
   Station,
   VodDetail,
+  ViewCount,
   VodList,
 } from "./types";
 
@@ -27,9 +29,9 @@ export class ApiError extends Error {
   }
 }
 
-/** GET 요청을 보내고 JSON을 돌려준다. 실패하면 ApiError를 던진다. */
-async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const res = await fetch(API_BASE + path, { signal });
+/** 요청을 보내고 JSON을 돌려준다. 실패하면 ApiError를 던진다. */
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const res = await fetch(API_BASE + path, init);
 
   if (!res.ok) {
     // 백엔드 에러 응답은 {"detail": "...", "code": "..."} 모양.
@@ -42,6 +44,15 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
     );
   }
   return (await res.json()) as T;
+}
+
+function get<T>(path: string, signal?: AbortSignal): Promise<T> {
+  return request<T>(path, { signal });
+}
+
+/** 본문 없는 POST. 본문이 없어서 CORS 사전 요청(OPTIONS)도 생기지 않는다. */
+function post<T>(path: string, signal?: AbortSignal): Promise<T> {
+  return request<T>(path, { method: "POST", signal });
 }
 
 // ---------------------------------------------------------- station
@@ -72,6 +83,11 @@ export function listReviews(
 /** VOD 정보와 파트(파일) 목록. 없으면 404 (VOD_NOT_FOUND) */
 export function getVod(vodId: number, signal?: AbortSignal) {
   return get<VodDetail>(`/review/${vodId}`, signal);
+}
+
+/** 조회수 +1. 올린 뒤의 조회수를 돌려준다. 없는 VOD면 404 (VOD_NOT_FOUND) */
+export function addView(vodId: number, signal?: AbortSignal) {
+  return post<ViewCount>(`/review/${vodId}/view`, signal);
 }
 
 /**
