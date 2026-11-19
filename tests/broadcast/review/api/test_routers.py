@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from app.models import Chat, Streamer, Vod, VodFile
+from app.models import Chat, Streamer, Vod, VodFile, VodView
 from app.utils.tz import KST
 
 VOD_ID = 1000
@@ -35,7 +35,7 @@ def _chat(t: float, message: str) -> Chat:
     )
 
 
-# ---------------------------------------------------------------- GET /review/{vod_id}
+# ------------------------------------------- GET /review/{vod_id}
 
 
 @pytest.mark.asyncio
@@ -63,6 +63,7 @@ async def test_get_vod(client, db):
         "다시보기 제목",
         "닉네임",
     )
+    assert body["views"] == 0
     assert body["files"] == [
         {
             "file_order": 1,
@@ -91,7 +92,35 @@ async def test_get_vod_rejects_non_number_id(client):
     assert response.json()["code"] == "VALIDATION_ERROR"
 
 
-# ---------------------------------------------------------- GET /review/{vod_id}/chats
+# --------------------------------------- POST /review/{vod_id}/view
+
+
+@pytest.mark.asyncio
+async def test_add_view(client, db):
+    """요청마다 1씩 올리고, 올린 뒤의 조회수를 주는지. GET 상세에도 반영되는지."""
+    db.add(_vod())
+    await db.commit()
+
+    first = await client.post(f"/review/{VOD_ID}/view")
+    second = await client.post(f"/review/{VOD_ID}/view")
+
+    assert (first.status_code, first.json()) == (200, {"views": 1})
+    assert (second.status_code, second.json()) == (200, {"views": 2})
+    detail = await client.get(f"/review/{VOD_ID}")
+    assert detail.json()["views"] == 2
+
+
+@pytest.mark.asyncio
+async def test_add_view_unknown_returns_404(client, db):
+    """없는 VOD 면 404 와 에러 코드를 주고, 행을 만들지 않는지."""
+    response = await client.post(f"/review/{VOD_ID}/view")
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "VOD_NOT_FOUND"
+    assert await db.get(VodView, VOD_ID) is None
+
+
+# -------------------------------------- GET /review/{vod_id}/chats
 
 
 @pytest.mark.asyncio

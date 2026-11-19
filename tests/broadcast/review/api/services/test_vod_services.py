@@ -9,7 +9,7 @@ import pytest
 from app.broadcast.review.api.exceptions import VodNotFound
 from app.broadcast.review.api.schemas.vod_schemas import VodDetailOut, VodFileOut
 from app.broadcast.review.api.services import vod_services
-from app.models import Streamer, Vod, VodFile
+from app.models import Streamer, Vod, VodFile, VodView
 from app.utils.tz import KST
 
 VOD_ID = 1000
@@ -80,6 +80,7 @@ async def test_get_vod(db):
         hashtags=["게임", "토크"],
         bid=BID,
         nick="닉네임",
+        views=0,
         files=[
             VodFileOut(
                 file_order=1,
@@ -111,3 +112,38 @@ async def test_get_vod_nick_falls_back_to_bid(db):
     vod = await vod_services.get_vod(db, VOD_ID)
 
     assert vod.nick == BID
+
+
+@pytest.mark.asyncio
+async def test_get_vod_views(db):
+    """vod_views 에 행이 있으면 그 cnt 를 views 로 주는지."""
+    await _add(db, _vod())
+    await _add(db, VodView(vod_id=VOD_ID, cnt=7))
+
+    vod = await vod_services.get_vod(db, VOD_ID)
+
+    assert vod.views == 7
+
+
+# ---------------------------------------------------------------- 조회수
+
+
+@pytest.mark.asyncio
+async def test_add_view(db):
+    """처음엔 1로 만들고, 그 뒤로는 1씩 올리는지."""
+    await _add(db, _vod())
+
+    first = await vod_services.add_view(db, VOD_ID)
+    second = await vod_services.add_view(db, VOD_ID)
+
+    assert (first.views, second.views) == (1, 2)
+    assert (await db.get(VodView, VOD_ID, populate_existing=True)).cnt == 2
+
+
+@pytest.mark.asyncio
+async def test_add_view_unknown_raises(db):
+    """없는 VOD 면 VodNotFound 를 내고 vod_views 에 행을 만들지 않는지."""
+    with pytest.raises(VodNotFound):
+        await vod_services.add_view(db, VOD_ID)
+
+    assert await db.get(VodView, VOD_ID) is None
