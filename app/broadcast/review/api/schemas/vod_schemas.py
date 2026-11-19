@@ -49,3 +49,8 @@ class VodDetailOut(VodListItem):
     bid: str
     nick: str
     files: list[VodFileOut]
+    views: int
+
+
+class ViewOut(BaseModel):
+    views: int
